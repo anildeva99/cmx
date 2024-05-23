@@ -1,0 +1,145 @@
+---
+- name: Provision keypairs for bastion host, worker nodes, etc
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: application-secret
+        tasks_from: locals.yml
+
+    - name: Configure application secrets
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: application-secret
+        tasks_from: configure-keypair-terraform.yml
+
+    - name: Configure the customer vpn keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_customer_networking_private_key }}"
+        aws_secret_private_key_path_var: "{{ customer_networking_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export the customer networking router public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_customer_networking_private_key }}"
+        aws_secret_keypair_public_key: customer_networking_keypair_public_key
+      import_role:
+        name: application-secret
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure the ingress mirth keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_ingress_mirth_ubuntu_private_key }}"
+        aws_secret_private_key_path_var: "{{ ingress_mirth_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export the ingress mirth public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_ingress_mirth_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: ingress_mirth_keypair_public_key
+      import_role:
+        name: application-secret
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure ec2-user's keypair for the worker node
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_worker_node_private_key }}"
+        aws_secret_private_key_path_var: "{{ worker_node_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export ec2-user's public key for worker nodes to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_worker_node_private_key }}"
+        aws_secret_keypair_public_key: worker_node_keypair_public_key
+      import_role:
+        name: application-secret
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure ubuntu's keypair for bastion host
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_private_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export baston host public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: bastion_host_keypair_public_key
+      import_role:
+        name: application-secret
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure ec2-user's keypair for the data lake nodes
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_data_lake_emr_host_private_key }}"
+        aws_secret_private_key_path_var: "{{ data_lake_emr_host_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export ec2-user's public key for data lake nodes to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_data_lake_emr_host_private_key }}"
+        aws_secret_keypair_public_key: data_lake_emr_host_keypair_public_key
+      import_role:
+        name: application-secret
+        tasks_from: export-publickey-to-env.yml
+
+- name: Provision application environment and configure Kubernetes
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+    - name: Configure the environment
+      environment:
+       TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+       name: environment
+       tasks_from: configure-environment.yml
+
+    - name: Register kubectl contexts
+      import_role:
+       name: environment
+       tasks_from: manage-kubectl-contexts.yml

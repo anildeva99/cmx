@@ -1,0 +1,16 @@
+---
+- name: Remove the environment configmap from the provisioned environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Create configmap
+      import_role:
+        name: environment-configmap
+        tasks_from: configure-environment-configmap.yml

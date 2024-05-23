@@ -1,0 +1,11 @@
+---
+- name: AWX Cleanup Tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Remove Role
+      import_role:
+        name: awx-prechecks
+        tasks_from: remove-role.yml
+

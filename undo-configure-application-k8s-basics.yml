@@ -1,0 +1,44 @@
+---
+- name: Clean out K8S configuration from application cluster
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: k8s-basics
+        tasks_from: pre.yml
+
+    - name: Configure Kubernetes basics (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: configure-k8s-basics.yml
+
+    - name: Install cert-manager (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: install-cert-manager.yml
+
+    - name: Configure Metrics server (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: install-metrics-server.yml
+
+    - name: Install and configure Istio (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: install-istio.yml

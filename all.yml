@@ -1,0 +1,44 @@
+---
+- name: Run all playbooks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+
+# Provision application environment, configure it
+- name: Import provision-environment.yml
+  import_playbook: provision-environment.yml
+- name: Import configure-bastions.yml
+  import_playbook: configure-bastions.yml
+- name: Import prepare-application-database.yml
+  import_playbook: prepare-application-database.yml
+- name: Import prepare-mirth-databases.yml
+  import_playbook: prepare-mirth-databases.yml
+- name: Import prepare-data-warehouse.yml
+  import_playbook: prepare-data-warehouse.yml
+
+# Configure application k8s cluster and deploy services
+- name: Import configure-application-k8s-basics.yml
+  import_playbook: configure-application-k8s-basics.yml
+- name: Import configure-k8s-new-relic-integration.yml
+  import_playbook: configure-k8s-new-relic-integration.yml
+- name: Import deploy-cluster-bastion.yml
+  import_playbook: deploy-cluster-bastion.yml
+- name: Import deploy-environment-configmap.yml
+  import_playbook: deploy-environment-configmap.yml
+- name: Import deploy-application-services.yml
+  import_playbook: deploy-application-services.yml
+- name: Import deploy-application-mirth.yml
+  import_playbook: deploy-application-mirth.yml
+- name: Import configure-application-ingress.yml
+  import_playbook: configure-application-ingress.yml
+
+# Configure ingress mirth
+- name: Import configure-ingress-mirth.yml
+  import_playbook: configure-ingress-mirth.yml
+
+# Configure customer networking (VPN tunnels)
+- name: Import prepare-customer-networking.yml
+  import_playbook: prepare-customer-networking.yml
+  when: (enable_customer_networking)

@@ -1,0 +1,46 @@
+---
+- name: Generate local configurations for application database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: database
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+- name: Configure the database itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Clean the database schemas, etc
+      vars:
+        database_address: "{{ hostvars['localhost']['app_db_facts'].instances[0].endpoint.address }}"
+      import_role:
+        name: database
+        tasks_from: configure-database.yml
+
+    - name: Remove users from the database
+      vars:
+        database_address: "{{ hostvars['localhost']['app_db_facts'].instances[0].endpoint.address }}"
+      import_role:
+        name: database
+        tasks_from: configure-users.yml

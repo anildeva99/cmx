@@ -1,0 +1,44 @@
+---
+- name: Clean out K8S config and unprovision environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: application-secret
+        tasks_from: locals.yml
+
+    - name: Configure application secrets
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: application-secret
+        tasks_from: configure-keypair-terraform.yml
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+    - name: Configure the environment
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: configure-environment.yml
+
+    - name: Remove kubectl contexts
+      import_role:
+        name: environment
+        tasks_from: manage-kubectl-contexts.yml

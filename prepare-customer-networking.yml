@@ -1,0 +1,97 @@
+---
+- name: Generate local configurations for application database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: customer-networking
+        tasks_from: pre.yml
+
+    - name: Build local configuration
+      import_role:
+        name: customer-networking
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for bastion host, ubuntu
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+    - name: Create temporary private key file for Cisco CSR, ec2-user
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_customer_networking_private_key }}"
+        localhost_key_path_var: "{{ customer_networking_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure CSR 1
+  hosts: csr-1-private.{{ env }}.application.codametrix.com
+  gather_facts: false
+  vars:
+    # Definitely prefer the first configuration,
+    # but it doesn't seem to want to work.
+    #ansible_ssh_common_args: "-C -F {{ temp_directory }}/ssh-{{ env }}-ingress.cfg"
+    ansible_ssh_common_args: >
+      -o ProxyCommand="ssh -i {{ bastion_host_ubuntu_private_key_path }}
+      -o StrictHostKeyChecking=no
+      -q
+      -A ubuntu@ingress-bastion.{{ env }}.application.codametrix.com nc %h %p"
+    state: present
+    csr_domain: "{{ env }}.application.codametrix.com"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Prep the CSR 1 router
+      vars:
+        csr_name: csr-1
+        cmx_csr_1_private_eni_facts: "{{ hostvars['localhost']['cmx_csr_1_private_eni_facts'] }}"
+        partners_vpn_tunnel_preshared_key: "{{ hostvars['localhost']['partners_vpn_tunnel_preshared_key'] }}"
+        cumedicine_vpn_tunnel_preshared_key: "{{ hostvars['localhost']['cumedicine_vpn_tunnel_preshared_key'] }}"
+      import_role:
+        name: customer-networking
+        tasks_from: configure-csr.yml
+      when: (enable_customer_networking)
+
+- name: Delete temporary files
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete temporary private key file for ubuntu on the bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml
+
+    - name: Delete temporary private key file for ec2-user on the Cisco CSRs
+      vars:
+        localhost_temporary_key_path_var: "{{ customer_networking_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml

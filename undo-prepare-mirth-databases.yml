@@ -1,0 +1,39 @@
+---
+- name: Generate local configurations for Mirth database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: mirth-database
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+- name: Configure the database itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Clean the database (users, schemas, etc)
+      vars:
+        database_address: "{{ hostvars['localhost']['mirth_database_facts'].instances[0].endpoint.address }}"
+      import_role:
+        name: mirth-database
+        tasks_from: configure-database.yml

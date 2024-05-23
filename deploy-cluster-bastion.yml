@@ -1,0 +1,111 @@
+---
+- name: Deploy Cluster Bastion into the provisioned environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Configure the cluster bastion host bastion keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_cluster_bastion_host_private_key }}"
+        aws_secret_private_key_path_var : "{{ cluster_bastion_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+      when: (enable_cluster_bastion)
+
+    - name: Apply local configuration
+      import_role:
+        name: cluster-bastion
+        tasks_from: cluster-bastion-locals.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Create bastion user's temporary public key file for cluster bastion
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_cluster_bastion_host_private_key }}.pub"
+        localhost_key_path_var: "{{ cluster_bastion_private_key_path }}.pub"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+    - name: Create cluster bastion host's public key file for each developer
+      vars:
+        key_catagory_var: "cluster-bastion"
+        key_suffix: "{{ public_key_suffix }}"
+        developers_var: "{{ developers }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-developers-key-file.yml
+
+    - name: Create ubuntu user private key file for bastion host
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+    - name: Create cluster Bastion
+      import_role:
+        name: application-services
+        tasks_from: configure-cluster-bastion.yml
+
+- name: Connect to bastion hosts and apply changes
+  hosts: bastion
+  gather_facts: false
+  vars:
+    state: present
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply changes to bastion host
+      import_role:
+        name: application-services
+        tasks_from: configure-bastion.yml
+
+- name: Delete temporary public keys
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete cluster bastion ubuntu public key file from local
+      vars:
+        localhost_temporary_key_path_var: "{{ cluster_bastion_private_key_path }}.pub"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml
+
+    - name: Delete bastion host ubuntu private key file
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml
+
+    - name: Delete cluster bastion's public key file for developers
+      vars:
+        key_catagory_var: "cluster-bastion"
+        key_suffix: "{{ public_key_suffix }}"
+        developers_var: "{{ developers }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-developers-key-file.yml

@@ -1,0 +1,23 @@
+---
+- name: Clean k8s integration with New Relic agents
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Remove local configuration
+      import_role:
+        name: k8s-new-relic-integration
+        tasks_from: locals.yml
+
+    - name: Destroy Kubernetes (applications) and New Relic service agents
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-new-relic-integration
+        tasks_from: configure-k8s-new-relic-integration.yml

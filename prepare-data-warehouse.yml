@@ -1,0 +1,83 @@
+---
+- name: Generate local configurations for application data warehouse
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: data-warehouse
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Build local configuration
+      import_role:
+        name: data-warehouse
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for bastion host ubuntu user with permissions
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure the data warehouse itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Prep the data warehouse for use by the application
+      vars:
+        dw_address: "{{ hostvars['localhost']['redshift_cluster_facts'].results[0].endpoint.address }}"
+        dw_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DataWarehouseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: data-warehouse
+        tasks_from: configure-dw.yml
+
+    - name: Prep the data warehouse users for use by the application and developers
+      vars:
+        dw_address: "{{ hostvars['localhost']['redshift_cluster_facts'].results[0].endpoint.address }}"
+        dw_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DataWarehouseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: data-warehouse
+        tasks_from: configure-users.yml
+
+- name: Delete temporary files
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml

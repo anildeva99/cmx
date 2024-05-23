@@ -1,0 +1,48 @@
+---
+- name: Configure application cluster k8s basics
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      vars:
+        vpc_type_tag: application_vpc
+      import_role:
+        name: k8s-basics
+        tasks_from: pre.yml
+
+    - name: Configure Kubernetes basics (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+        worker_node_role_name: "{{ application_worker_node_instance_role }}"
+        fluentd_elasticsearch_host: "elasticsearch.{{ env }}.application.codametrix.com"
+      import_role:
+        name: k8s-basics
+        tasks_from: configure-k8s-basics.yml
+
+    - name: Install cert-manager (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: install-cert-manager.yml
+
+    - name: Configure Metrics server (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: install-metrics-server.yml
+
+    - name: Install and configure Istio (application)
+      vars:
+        cluster_name: "{{ eks_cluster_name }}"
+      import_role:
+        name: k8s-basics
+        tasks_from: install-istio.yml

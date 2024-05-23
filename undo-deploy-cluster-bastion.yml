@@ -1,0 +1,21 @@
+---
+- name: Undeploy Cluster Bastion from the provisioned environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Destroy Cluster Bastion service
+      import_role:
+        name: application-services
+        tasks_from: configure-cluster-bastion.yml
+
+    - name: Remove local configuration
+      import_role:
+        name: application-services
+        tasks_from: cluster-bastion-locals.yml

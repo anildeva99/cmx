@@ -1,0 +1,16 @@
+---
+- name: Deploy the application into the provisioned environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Create services
+      import_role:
+        name: application-services
+        tasks_from: configure-services.yml

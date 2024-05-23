@@ -1,0 +1,44 @@
+---
+- name: Run all undo playbooks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+
+# Undo configuration of ingress k8s cluster
+- name: Import undo-configure-ingress-mirth.yml
+  import_playbook: undo-configure-ingress-mirth.yml
+- name: Import undo-configure-k8s-new-relic-integration.yml
+  import_playbook: undo-configure-k8s-new-relic-integration.yml
+
+# Undo configuration of application k8s cluster
+- name: Import undo-configure-application-ingress.yml
+  import_playbook: undo-configure-application-ingress.yml
+- name: Import undo-deploy-application-mirth.yml
+  import_playbook: undo-deploy-application-mirth.yml
+- name: Import undo-deploy-application-services.yml
+  import_playbook: undo-deploy-application-services.yml
+- name: Import undo-deploy-environment-configmap.yml
+  import_playbook: undo-deploy-environment-configmap.yml
+- name: Import undo-deploy-cluster-bastion.yml
+  import_playbook: undo-deploy-cluster-bastion.yml
+- name: Import undo-configure-application-k8s-basics.yml
+  import_playbook: undo-configure-application-k8s-basics.yml
+
+# NOTE: undo-prepare-database.yml is failing currently
+#   due to dependencies between roles and schemas
+#- name: Import undo-prepare-application-database.yml
+#  import_playbook: undo-prepare-application-database.yml
+# NOTE: undo-prepare-mirth-database.yml is failing currently
+#   due to dependencies between roles and schemas
+#- name: Import undo-prepare-mirth-databases.yml
+#  import_playbook: undo-prepare-mirth-databases.yml
+#- name: Import undo-prepare-data-warehouse.yml
+#  import_playbook: undo-prepare-data-warehouse.yml
+
+# Undo provisioning of application environment, do cleanup
+- name: Import undo-provision-environment.yml
+  import_playbook: undo-provision-environment.yml
+- name: Import clean-terraform.yml
+  import_playbook: clean-terraform.yml

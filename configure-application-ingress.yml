@@ -1,0 +1,16 @@
+---
+- name: Configure ingress into the application
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Configure application ingress
+      import_role:
+        name: application-ingress
+        tasks_from: configure-ingress.yml

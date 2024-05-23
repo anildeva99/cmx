@@ -1,0 +1,11 @@
+---
+- name: AWX Setup Tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Assume Role
+      import_role:
+        name: awx-prechecks
+        tasks_from: insert-credentials.yml
+

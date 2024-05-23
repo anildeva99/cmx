@@ -1,0 +1,181 @@
+---
+- name: Delete a user preparatory tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars_prompt:
+    - name: delete_user
+      prompt: Username of the user to delete
+      private: no
+  pre_tasks:
+    - name: Re-export delete_user for cross playbook visibility
+      set_fact:
+        delete_user: '{{ delete_user }}'
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration for the bastion
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Apply preparatory configuration for the application database
+      import_role:
+        name: database
+        tasks_from: pre.yml
+
+    - name: Apply preparatory configuration for the mirth databases
+      import_role:
+        name: mirth-database
+        tasks_from: pre.yml
+
+    - name: Apply preparatory configuration for the data warehouse
+      import_role:
+        name: data-warehouse
+        tasks_from: pre.yml
+
+    - name: Create temporary private key file
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+- name: Delete user from bastion host tasks
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete user from the bastion host
+      import_role:
+        name: bastion
+        tasks_from: delete-user.yml
+
+- name: Delete user from ingress_bastion host tasks
+  hosts: ingress_bastion
+  gather_facts: false
+  vars:
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}-ingress.cfg"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete user from the ingress bastion host
+      vars:
+        delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+      import_role:
+        name: bastion
+        tasks_from: delete-user.yml
+
+- name: Remove the user from the application database
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete the user from the application database
+      vars:
+        database_address: "{{ ['app_db_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DatabaseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: database
+        tasks_from: delete-user.yml
+
+- name: Remove the user from the application Mirth database
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Remove the user from the application Mirth data
+      vars:
+        database_address: "{{ hostvars['localhost']['application_mirth_database_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          mirth_database_admin_secret_name,
+          region=region) }}"
+      import_role:
+        name: mirth-database
+        tasks_from: delete-user.yml
+
+- name: Remove the user from the ingress mirth database
+  hosts: ingress_bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}-ingress.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Remove the user from the ingress mirth database
+      vars:
+        database_address: "{{ hostvars['localhost']['ingress_mirth_database_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          ingress_mirth_database_admin_secret_name,
+          region=region) }}"
+      import_role:
+        name: mirth-database
+        tasks_from: delete-user.yml
+
+- name: Remove the user from the data warehouse
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Remove the user from the data warehouse
+      vars:
+        dw_address: "{{ hostvars['localhost']['redshift_cluster_facts'].results[0].endpoint.address }}"
+        dw_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DataWarehouseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: data-warehouse
+        tasks_from: delete-user.yml
+
+- name: Delete user post tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml

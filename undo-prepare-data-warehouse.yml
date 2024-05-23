@@ -1,0 +1,43 @@
+---
+- name: Generate local configurations for application database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: data-warehouse
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+- name: Configure the data warehouse itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Remove users from the data warehouse
+      vars:
+        # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+        dw_address: "{{ ['redshift_cluster_facts'].results[0].endpoint.address }}"
+        dw_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DataWarehouseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: data-warehouse
+        tasks_from: configure-users.yml

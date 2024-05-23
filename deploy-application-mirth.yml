@@ -1,0 +1,16 @@
+---
+- name: Deploy Mirth into the provisioned environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Create Mirth service
+      import_role:
+        name: mirth
+        tasks_from: configure-mirth.yml

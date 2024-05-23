@@ -1,0 +1,85 @@
+---
+- name: Generate local configurations for application database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: database
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Build local configuration
+      import_role:
+        name: database
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for bastion host ubuntu user
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure the database itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Prep the database schemas, etc for use by the application
+      vars:
+        # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+        database_address: "{{ ['app_db_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DatabaseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: database
+        tasks_from: configure-database.yml
+
+    - name: Prep the database users for use by the application and developers
+      vars:
+        # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+        database_address: "{{ ['app_db_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixApplication/DatabaseAdmin/' + env,
+          region=region) }}"
+      import_role:
+        name: database
+        tasks_from: configure-users.yml
+
+- name: Delete temporary files
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: application-secret
+        tasks_from: delete-temporary-key-file.yml

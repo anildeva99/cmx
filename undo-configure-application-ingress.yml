@@ -1,0 +1,16 @@
+---
+- name: Undo configuration of the ingress into the application
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Configure ingress
+      import_role:
+        name: application-ingress
+        tasks_from: configure-ingress.yml

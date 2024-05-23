@@ -1,0 +1,16 @@
+---
+- name: Undeploy the application from the provisioned environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import application-common role
+      import_role:
+        name: application-common
+
+    - name: Destroy services
+      import_role:
+        name: application-services
+        tasks_from: configure-services.yml
