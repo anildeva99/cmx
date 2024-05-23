@@ -1,0 +1,13 @@
+terraform {
+  required_version = "~> 0.12.24"
+  required_providers {
+    aws = "~> 3.0"
+    archive = "~> 1.2.0"
+  }
+
+  backend "s3" {
+    bucket = "{{ management_bucket }}"
+    key    = "terraform/traffic-cop-ssh-keypair-{{ env }}/terraform.tfstate"
+    region = "{{ region }}"
+  }
+}

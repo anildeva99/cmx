@@ -1,0 +1,89 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Delete a user preparatory tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars_prompt:
+    - name: delete_user
+      prompt: Username of the user to delete
+      private: no
+  pre_tasks:
+    - name: Re-export delete_user for cross playbook visibility
+      set_fact:
+        delete_user: '{{ delete_user }}'
+  tasks:
+    - name: Apply preparatory configuration for the bastion
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Apply preparatory configuration for the mirth databases
+      import_role:
+        name: mirth-database
+        tasks_from: pre.yml
+
+    - name: Create temporary private key file
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+- name: Delete user from bastion host tasks
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Delete user from the bastion host
+      import_role:
+        name: bastion
+        tasks_from: delete-user.yml
+
+- name: Remove the user from the Mirth database
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    delete_user: "{{ hostvars['localhost']['delete_user'] }}"
+  tasks:
+    - name: Remove the user from the Mirth database
+      vars:
+        database_address: "{{ hostvars['localhost']['mirth_database_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          mirth_database_admin_secret_name,
+          region=region) }}"
+      import_role:
+        name: mirth-database
+        tasks_from: delete-user.yml
+
+- name: Delete user post tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml

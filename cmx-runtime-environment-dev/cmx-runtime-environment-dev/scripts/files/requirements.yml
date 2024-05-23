@@ -1,0 +1,27 @@
+---
+# Ansible collections that get installed by setup.sh
+collections:
+  # For cisco VPN
+  - name: "cisco.ios"
+    version: "1.2.1"
+  # For openssh
+  - name: "community.crypto"
+    version: "1.3.0"
+  # For terraform module
+  - name: "community.general"
+    version: "1.2.0"
+  # For k8s module
+  - name: "community.kubernetes"
+    version: "1.1.1"
+  # For postgresql modules
+  - name: "community.postgresql"
+    version: "1.0.0"
+  # For official AWS modules
+  - name: "amazon.aws"
+    version: "1.2.1"
+  # For community AWS modules
+  - name: "community.aws"
+    version: "1.2.1"
+  # For AD modules in tools repo
+  - name: "community.windows"
+    version: "1.2.0"

@@ -1,0 +1,8 @@
+---
+- name: Lookup public key in AWS secret manager and export it to env
+  vars:
+    secret_name: "{{ aws_secret_private_key_var }}.pub"
+  set_fact:
+    "{{ aws_secret_keypair_public_key }}" : "{{ lookup('aws_secret',
+                                                  secret_name,
+                                                  region=region) }}"

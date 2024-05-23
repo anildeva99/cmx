@@ -1,0 +1,43 @@
+---
+- name: "Set cert-manager namespace resource state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'certmanager-namespace.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: Download Cert-Manager installation to the temp directory
+  vars:
+    base_url: "https://github.com/jetstack/cert-manager/releases/download"
+  get_url:
+    url: "{{ base_url }}/v{{ cert_manager_version }}/cert-manager.yaml"
+    dest: "{{ temp_directory }}/cert-manager-{{ cert_manager_version }}.yaml"
+    mode: 0644
+
+- name: Apply all Cert-Manager custom resources and install it
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: cert-manager
+    resource_definition: "{{ lookup('file',
+      '{{ temp_directory }}/cert-manager-{{ cert_manager_version }}.yaml')|
+      from_yaml_all|select('ne', None)|list }}"
+    state: "{{ state }}"
+
+- name: Switch kubectl contexts
+  command: >
+    kubectl config use-context
+    "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+  when: (state == 'present')
+
+# TODO: [DEVOPS-399] Look into why we need to annotate cert-manager pods
+# !!! For some reason this doesn't always work and when it doesn't,
+# certificates fail to renew since cert manager
+# !!! can't update route53
+- name: "Annotate cert manager pods with IAM role
+    to allow kube2iam to give them access to stuff"
+  command: >
+    kubectl annotate pods
+    --overwrite=true --all
+    -n cert-manager iam.amazonaws.com/role="{{ certmanager_role }}"
+  when: (state == 'present')

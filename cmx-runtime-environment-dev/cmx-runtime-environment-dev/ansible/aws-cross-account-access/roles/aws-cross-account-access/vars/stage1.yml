@@ -1,0 +1,31 @@
+---
+region: us-east-1
+management_bucket: management.cmxstage.codametrix.com
+env: stage1
+
+foreign_accounts:
+  - "097524411557" # cmx onboarding
+
+# ECR repos that will be enabled for cross-account access
+ecr_repos: []
+
+# S3 Buckets that access will be given to.
+s3_buckets:
+  data-lake.stage1.application.codametrix.com:
+      - bucket_object_spec: "*"
+        bucket_object_actions:
+          - s3:Get*
+          - s3:List*
+        bucket_actions:
+          - s3:Get*
+          - s3:List*
+        foreign_account:
+          - 097524411557
+
+kms_keys:
+  - key_alias: "alias/CodaMetrixApplication-{{ env }}-application_data_lake_emr_kms_key"
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey
+      - GenerateDataKey

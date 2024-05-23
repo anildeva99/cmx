@@ -1,0 +1,9 @@
+---
+# TODO: [DEVOPS-398] Switch to using handlers for restarting services
+- name: Restart/enable Mirth
+  become: true
+  systemd:
+    enabled: true
+    daemon_reload: true
+    name: mirth
+    state: "{{ restart_ingress_mirth | bool | ternary('restarted', 'started') }}"

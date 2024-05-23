@@ -1,0 +1,39 @@
+---
+- name: Revoke access to all tables in the codametrix database
+  community.postgresql.postgresql_query:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON DATABASE {{ application_database_name }} FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+
+- name: Revoke access to all tables in the microservice databases
+  community.postgresql.postgresql_query:
+    db: "{{ service }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON DATABASE {{ service }} FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+  loop: "{{ services }}"
+  loop_control:
+    loop_var: service
+
+- name: Delete a single Postgres user (role)
+  community.general.postgresql_user:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    name: "{{ delete_user|lower }}"
+    ssl_mode: require
+    state: absent

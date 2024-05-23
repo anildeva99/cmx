@@ -1,0 +1,149 @@
+---
+- name: "Generate 91-cmx-sudoers file to enable
+    configured users to sudo on the bastions"
+  become: true
+  template:
+    dest: /etc/sudoers.d/91-cmx-sudoers
+    mode: 0440
+    src: 91-cmx-sudoers.j2
+
+- name: Download RDS CA certificate bundle
+  become: true
+  get_url:
+    url: "{{ rds_certificate_bundle_url }}"
+    dest: "{{ rds_certificate_bundle_path }}"
+  register: rds_ca_bundle_downloaded
+
+- name: Update CA certificates
+  become: true
+  command: "update-ca-certificates"
+  when: rds_ca_bundle_downloaded.changed
+
+# TODO: [DEVOPS-388] Replace ansible pause with until loop
+- name: Sleep 30 seconds, prevent possible failure of installing PG
+  pause:
+    seconds: 30
+
+- name: Install PG client packages for python2/python3
+  become: true
+  apt:
+    name:
+      - python-psycopg2
+      - libpq-dev
+      - python3-psycopg2
+      - python-pg8000
+      - python3-pg8000
+    state: "{{ state }}"
+    update_cache: true
+
+# Create a new user (bastion) with keypair generated in locals.yml
+- name: "Add the user 'bastion' with a bash shell,
+    setting the group to 'nogroup'"
+  become: true
+  user:
+    group: nogroup
+    name: bastion
+    shell: /bin/bash
+
+- name: Create a .ssh directory for 'bastion' user
+  become: true
+  file:
+    group: nogroup
+    mode: 0700
+    owner: bastion
+    path: /home/bastion/.ssh
+    state: directory
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Copy the bastion user public key to the bastion
+    host in the /home/bastion/.ssh/ directory"
+  become: true
+  copy:
+    content: "{{ lookup('aws_secret',
+      '{{ aws_secret_bastion_host_bastion_private_key }}.pub',
+      region=region) }}"
+    dest: /home/bastion/.ssh/authorized_keys
+    group: nogroup
+    mode: 0600
+    owner: bastion
+
+# Create a new user for each developer with keypair
+# generated in locals.yml
+- name: "Add the developer users with a bash shell,
+    setting the group to 'nogroup'"
+  become: true
+  user:
+    group: nogroup
+    name: "{{ dev.name|lower }}"
+    shell: /bin/bash
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+
+- name: Create a .ssh directory for developer user
+  become: true
+  file:
+    group: nogroup
+    mode: 0700
+    owner: "{{ dev.name|lower }}"
+    path: "/home/{{ dev.name|lower }}/.ssh"
+    state: directory
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Copy each developers public key to the bastion host
+    in the /home/{{ dev.name }}/.ssh/ directory"
+  become: true
+  copy:
+    content: "{{ lookup('aws_secret',
+      'CodaMetrixApplication/Developers/bastion-host-{{ env }}-{{ dev.name|lower }}-id_ssh_rsa.pub',
+      region=region) }}"
+    dest: "/home/{{ dev.name|lower }}/.ssh/authorized_keys"
+    owner: "{{ dev.name|lower }}"
+    group: nogroup
+    mode: 0600
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+
+# Create a new user for each bastion additional
+# user with keypair generated in locals.yml
+- name: "Add the bastion additional users with a bash shell,
+    setting the group to 'nogroup'"
+  become: true
+  user:
+    group: nogroup
+    name: "{{ addit_user.name|lower }}"
+    shell: /bin/bash
+  loop: "{{ bastion_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+
+- name: Create a .ssh directory for bastion additional users
+  become: true
+  file:
+    group: nogroup
+    mode: 0700
+    owner: "{{ addit_user.name|lower }}"
+    path: "/home/{{ addit_user.name|lower }}/.ssh"
+    state: directory
+  loop: "{{ bastion_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+
+- name: "Copy each bastion additional users public key to the bastion host
+    in the /home/{{ addit_user.name }}/.ssh/ directory"
+  become: true
+  copy:
+    content: "{{ lookup('aws_secret',
+      'CodaMetrixApplication/BastionAdditionalUsers/bastion-host-{{ env }}-{{ addit_user.name|lower }}-id_ssh_rsa.pub',
+      region=region) }}"
+    dest: /home/{{ addit_user.name|lower }}/.ssh/authorized_keys
+    group: nogroup
+    mode: 0600
+    owner: "{{ addit_user.name|lower }}"
+  loop: "{{ bastion_additional_users }}"
+  loop_control:
+    loop_var: addit_user

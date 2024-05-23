@@ -1,0 +1,15 @@
+---
+- name: Fail when var not defined
+  fail:
+    msg: "Variable '{{ var }}' is not defined, use -e <var>"
+  loop:
+    - "env"
+  loop_control:
+    loop_var: var
+  when: (var not in vars)
+
+- name: Include environ variables
+  include_vars:
+    dir: "{{ playbook_dir }}/environments/{{ env }}/group_vars/all"
+    extensions:
+      - "yml"

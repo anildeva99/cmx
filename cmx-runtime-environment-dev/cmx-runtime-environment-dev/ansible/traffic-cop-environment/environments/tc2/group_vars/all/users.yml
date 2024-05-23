@@ -1,0 +1,30 @@
+---
+engineers:
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: JeffreyTaylor
+    email: jeffrey@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: KeithGrohbrugge
+    email: keith@codametrix.com
+  - name: RobCosta
+    email: rob@codametrix.com
+  - name: ToniAbrams
+    email: toni@codametrix.com
+  - name: DebbieWalker
+    email: debbie@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+    bastion_sudo: true
+  - name: MikeLane
+    email: mlane@codametrix.com
+  - name: KellyKeene
+    email: kelly@codametrix.com
+
+bastion_additional_users: []

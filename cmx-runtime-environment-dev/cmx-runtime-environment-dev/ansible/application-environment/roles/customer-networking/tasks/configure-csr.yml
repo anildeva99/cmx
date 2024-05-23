@@ -1,0 +1,21 @@
+---
+- name: Configure CSR 1 Hostname and Domain
+  cisco.ios.ios_config:
+    lines:
+      - "hostname {{ csr_name }}"
+      - "ip domain name {{ csr_domain }}"
+    save_when: changed
+
+- name: Configure CSR 1 private interface (GigabitEthernet2)
+  cisco.ios.ios_config:
+    lines:
+      - "ip address {{ cmx_csr_1_private_eni_facts.network_interfaces[0].private_ip_address }} 255.255.255.0"
+      - no shutdown
+    parents:
+      - interface GigabitEthernet2
+    save_when: changed
+
+- name: Apply IOS configuration file
+  cisco.ios.ios_config:
+    save_when: changed
+    src: "{{ csr_name }}-config-{{ env }}.j2"

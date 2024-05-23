@@ -1,0 +1,44 @@
+---
+developers:
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: JeffreyTaylor
+    email: jeffrey@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: BrianMottershead
+    email: brian@codametrix.com
+  - name: RichardTrevorrow
+    email: rtrevorrow@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+    bastion_sudo: true
+
+ops_users:
+  # Jenkins Build User
+  - userarn: arn:aws:iam::{{ codametrix_tools_account_id }}:user/CodametrixTools-tools-BuildUser
+    username: build-user
+    group: system:masters
+  # Quincy Els
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/quincy@codametrix.com
+    username: quincyels
+    group: system:masters
+
+bastion_additional_users: []
+
+database_additional_users: []
+
+database_superusers: []
+
+data_warehouse_additional_users: []
+
+data_warehouse_additional_rw_users: []
+
+data_warehouse_additional_superusers: []
+
+data_lake_additional_users: []

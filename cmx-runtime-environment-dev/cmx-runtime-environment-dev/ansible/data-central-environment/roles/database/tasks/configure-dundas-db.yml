@@ -1,0 +1,111 @@
+---
+# Get Admin & User Credentials for Dundas DB
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Get Dundas DB Users Credentials
+  set_fact:
+    DUNDAS_DB_USER: "{{ (lookup('aws_secret',
+      'CodaMetrixDataCentral/Dundas/ApplicationDatabase/' + env + '-' + dundas_application_database_username,
+      region=region)) }}"
+    DUNDAS_DB_WAREHOUSE_USER: "{{ lookup('aws_secret',
+      'CodaMetrixDataCentral/Dundas/WarehouseDatabase/' + env + '-' + dundas_warehouse_database_username,
+      region=region) }}"
+
+- name: Add postgres user (role) for Dundas in Application DB
+  community.general.postgresql_user:
+    db: "{{ dundas_application_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ dundas_database_address }}"
+    login_password: "{{ dundas_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_database_credentials.dbusername }}"
+    name: "{{ DUNDAS_DB_USER.dbusername }}"
+    no_password_changes: true
+    password: "{{ DUNDAS_DB_USER.dbpassword }}"
+    priv: "CREATE/CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+
+- name: "Grant all for user {{ DUNDAS_DB_USER.dbusername }}"
+  community.postgresql.postgresql_query:
+    db: "{{ user }}"
+    login_host: "{{ dundas_database_address }}"
+    login_password: "{{ dundas_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_database_credentials.dbusername }}"
+    query: "GRANT ALL PRIVILEGES ON DATABASE \"{{ user }}\" TO {{ DUNDAS_DB_USER.dbusername }};"
+    ssl_mode: require
+  loop:
+    - "postgres"
+    - "{{ dundas_application_database_name }}"
+  loop_control:
+    loop_var: user
+  when: (state == 'present')
+
+- name: "Superuser Grant for user {{ DUNDAS_DB_USER.dbusername }}"
+  community.postgresql.postgresql_query:
+    db: "{{ dundas_application_database_name }}"
+    login_host: "{{ dundas_database_address }}"
+    login_password: "{{ dundas_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_database_credentials.dbusername }}"
+    query: "GRANT rds_superuser TO {{ DUNDAS_DB_USER.dbusername }};"
+    ssl_mode: require
+  when: (state == 'present')
+
+- name: "Create DB Grant for user {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }}"
+  community.postgresql.postgresql_query:
+    db: "{{ dundas_application_database_name }}"
+    login_host: "{{ dundas_database_address }}"
+    login_user: "{{ dundas_database_credentials.dbusername }}"
+    login_password: "{{ dundas_database_credentials.dbpassword }}"
+    query: "ALTER USER {{ DUNDAS_DB_USER.dbusername }} WITH CREATEDB;"
+    ssl_mode: require
+  when: (state == 'present')
+
+- name: Add postgres user (role) for Dundas in Warehouse DB
+  community.general.postgresql_user:
+    db: "{{ dundas_warehouse_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ dundas_warehouse_database_address }}"
+    login_password: "{{ dundas_warehouse_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_warehouse_database_credentials.dbusername }}"
+    name: "{{ DUNDAS_DB_WAREHOUSE_USER.dbusername }}"
+    no_password_changes: true
+    password: "{{ DUNDAS_DB_WAREHOUSE_USER.dbpassword }}"
+    priv: "CREATE/CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+
+- name: "Grant all privs for user {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }}"
+  community.postgresql.postgresql_query:
+    db: "{{ user }}"
+    login_host: "{{ dundas_warehouse_database_address }}"
+    login_password: "{{ dundas_warehouse_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_warehouse_database_credentials.dbusername }}"
+    query: "GRANT ALL PRIVILEGES ON DATABASE \"{{ user }}\" TO {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }};"
+    ssl_mode: require
+  loop:
+    - "postgres"
+    - "{{ dundas_warehouse_database_name }}"
+  loop_control:
+    loop_var: user
+  when: (state == 'present')
+
+- name: "Superuser grant for user {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }}"
+  community.postgresql.postgresql_query:
+    db: "{{ dundas_warehouse_database_name }}"
+    login_host: "{{ dundas_warehouse_database_address }}"
+    login_password: "{{ dundas_warehouse_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_warehouse_database_credentials.dbusername }}"
+    query: "GRANT rds_superuser TO {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }};"
+    ssl_mode: require
+  when: (state == 'present')
+
+- name: "Create DB Grant for user {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }}"
+  community.postgresql.postgresql_query:
+    db: "{{ dundas_warehouse_database_name }}"
+    login_host: "{{ dundas_warehouse_database_address }}"
+    login_password: "{{ dundas_warehouse_database_credentials.dbpassword }}"
+    login_user: "{{ dundas_warehouse_database_credentials.dbusername }}"
+    query: "ALTER USER {{ DUNDAS_DB_WAREHOUSE_USER.dbusername }} WITH CREATEDB;"
+    ssl_mode: require
+  when: (state == 'present')

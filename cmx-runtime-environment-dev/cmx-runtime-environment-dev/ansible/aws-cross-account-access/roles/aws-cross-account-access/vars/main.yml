@@ -1,0 +1,7 @@
+terraform_path: ../../terraform/aws-cross-account-access
+
+# Override to 'true' to force terraform initialization
+force_init: true
+
+# Override to 'absent' to remove the application environment
+state: present

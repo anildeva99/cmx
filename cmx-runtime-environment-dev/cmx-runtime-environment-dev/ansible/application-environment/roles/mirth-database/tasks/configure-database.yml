@@ -1,0 +1,82 @@
+---
+- name: Add postgres user (role)
+  community.general.postgresql_user:
+    db: "{{ mirth_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    name: "{{ mirth_database_username }}"
+    no_password_changes: true
+    priv: "CREATE/CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+
+# Add Postgres user (role) for each developer
+# !!! Maybe we shouldn't create a temporary password
+# !!! for the database for each developer. Might be more secure
+# !!! to not assign one until they ask for it.
+- name: Add postgres user (role) for each developer
+  community.general.postgresql_user:
+    db: "{{ mirth_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    name: "{{ dev.name|lower }}"
+    no_password_changes: true
+    priv: "CREATE/CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+
+# Give the admin access to Mirth schema
+- name: "Assign role ({{ mirth_database_username }}) to
+    user {{ mirth_database_admin_username }}"
+  community.postgresql.postgresql_query:
+    db: "{{ mirth_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    query: "GRANT {{ mirth_database_username }} TO {{ mirth_database_admin_username }};"
+    ssl_mode: require
+  when: (state == 'present')
+
+# Give the developers access to the Mirth schema
+- name: "Assign role ({{ mirth_database_username }}) to user {{ dev.name }}"
+  community.postgresql.postgresql_query:
+    db: "{{ mirth_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    query: "GRANT {{ mirth_database_username }} TO {{ dev.name }};"
+    ssl_mode: require
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+  when: (state == 'present')
+
+- name: Add postgres schema for Mirth to use
+  community.general.postgresql_schema:
+    database: "{{ mirth_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    name: "{{ mirth_database_schema_name }}"
+    owner: "{{ mirth_database_username }}"
+    ssl_mode: require
+    state: "{{ state }}"
+
+# Lock Mirth user (role) to it's schema
+- name: Assign postgres user (role) to the Mirth schema
+  community.postgresql.postgresql_query:
+    db: "{{ mirth_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    query: "ALTER USER {{ mirth_database_username }} SET search_path TO {{ mirth_database_schema_name }}"
+    ssl_mode: require

@@ -1,0 +1,8 @@
+---
+peer_vpc_routes:
+  - pcx_name: DataCentral1-CMXOnboardingApplication # Onboarding
+    destination_cidr: 10.53.0.0/16
+  - pcx_name: DataCentral1-CMXStage1Application # Stage 1
+    destination_cidr: 10.57.0.0/16
+  - pcx_name: ToolsNet-DataCentral1 # Tools Network <-> Data Central 1
+    destination_cidr: "{{ codametrix_tools_cidr }}"

@@ -1,0 +1,23 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo Nothing to do in the install phase...
+  pre_build:
+    commands:
+      - echo Nothing to do in the pre_build phase...
+      - echo Entered the pre_build phase
+  build:
+    commands:
+      - echo Build started on `date`
+      - cd ./docker/cmx-java-service-base/
+      - docker build -t $ARTIFACT_NAME -f ./Dockerfile ./
+      - docker save -o $ARTIFACT_NAME-$ARTIFACT_VERSION.tar $ARTIFACT_NAME:$ARTIFACT_VERSION
+  post_build:
+    commands:
+      - echo Build completed on `date`
+artifacts:
+  files:
+    - ./docker/cmx-java-service-base/$ARTIFACT_NAME-$ARTIFACT_VERSION.tar
+  discard-paths: true

@@ -1,0 +1,805 @@
+####################
+# Environment basics
+####################
+aws_region                   = "{{ region }}"
+environment                  = "{{ env }}"
+sso_login_account_id         = "{{ sso_login_account_id }}"
+
+# DR related vars
+dr_environment = "{{ dr_environment }}"
+dr_region = "{{ dr_region }}"
+enable_s3_replication = {{ enable_s3_replication|lower }}
+
+# !!! Remove this and replace with our own sagemaker-data bucket
+sagemaker_data_bucket =   "{{ sagemaker_data_bucket }}"
+sagemaker_data_key_alias_arn = "{{ sagemaker_data_key_alias_arn }}"
+
+application_peer_vpc_routes = {
+  {% for route in application_peer_vpc_routes %}
+    "{{ route.pcx_name }}" = {
+      "pcx_name" = "{{ route.pcx_name }}",
+      "destination_cidr" = "{{ route.destination_cidr }}"
+    },
+  {% endfor %}
+}
+
+ingress_peer_vpc_routes = {
+  {% for route in ingress_peer_vpc_routes %}
+    "{{ route.pcx_name }}" = {
+      "pcx_name" = "{{ route.pcx_name }}",
+      "destination_cidr" = "{{ route.destination_cidr }}"
+    },
+  {% endfor %}
+}
+
+shared_resource_tags = {
+  {% for key, value in shared_resource_tags.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+services  = [
+  {% for service in services %}
+  "{{ service }}",
+  {% endfor %}
+]
+
+cmx_api_public_whitelist = [
+  {% for ip in cmx_api_public_whitelist %}
+  "{{ ip }}",
+  {% endfor %}
+]
+
+service_roles = {
+  {% for key, value in service_roles.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+healthsystems  = [
+  {% for healthsystem in healthsystems %}
+  "{{ healthsystem }}",
+  {% endfor %}
+]
+
+tenants = {
+  {% for key, value in tenants.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+cmx_automate_dns_name             = "{{ cmx_automate_dns_name }}"
+application_env_dns_name          = "{{ application_env_dns_name }}"
+application_api_dns_address       = "{{ application_api_dns_address }}"
+application_static_dns_address    = "{{ application_static_dns_address }}"
+application_www_dns_address       = "{{ application_www_dns_address }}"
+
+# Process Data bucket
+process_data_bucket_key_alias     = "{{ process_data_bucket_key_alias }}"
+
+mu_default_task_execution_role = "{{ mu_default_task_execution_role }}"
+job_manifest_bucket = "{{ mu_job_manifest_bucket }}"
+job_manifest_kms_key_alias = "{{ mu_job_manifest_kms_key_alias }}"
+job_data_bucket = "{{ mu_job_data_bucket }}"
+process_data_bucket = "{{ process_data_bucket }}"
+
+database_temporary_password  = "{{ database_temporary_password }}"
+
+iam_resource_path            = "/"
+
+jwt_key_initial_value        = "{{ jwt_key_initial_value }}"
+
+application_logs_bucket      = "{{ application_logs_bucket }}"
+
+###################
+# EKS Cluster stuff
+###################
+cluster_name                      = "{{ eks_cluster_name }}"
+cluster_k8s_version               = "{{ cluster_k8s_version }}"
+kubernetes_external_secrets_role  = "{{ kubernetes_external_secrets_role }}"
+ecr_cred_helper_role              = "{{ ecr_cred_helper_role }}"
+fluentd_role                      = "{{ fluentd_role }}"
+aws_alb_ingress_controller_role   = "{{ aws_alb_ingress_controller_role }}"
+certmanager_role                  = "{{ certmanager_role }}"
+redshift_role                     = "{{ redshift_role }}"
+cluster_autoscaler_service_role   = "{{ cluster_autoscaler_service_role }}"
+
+###########
+# VPC Stuff
+###########
+vpc_cidr_block               = "{{ ip_range_prefix }}.0.0/16"
+vpc_subnet_cidr_block_prefix = "{{ ip_range_prefix }}"
+vpc_subnet_cidr_block_suffix = "0/24"
+
+###################
+# Ingress VPC Stuff
+###################
+ingress_vpc_cidr_block               = "{{ ingress_ip_range_prefix }}.0.0/16"
+ingress_vpc_subnet_cidr_block_prefix = "{{ ingress_ip_range_prefix }}"
+ingress_vpc_subnet_cidr_block_suffix = "0/24"
+
+enable_customer_networking = {{ enable_customer_networking|lower }}
+customer_networking_amis = {
+  {% for key, value in customer_networking_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+customer_networking_instance_type  = "{{ customer_networking_instance_type }}"
+customer_networking_key_name       = "{{ customer_networking_key_name }}"
+customer_networking_public_key     = "{{ customer_networking_keypair_public_key }}"
+
+###########################
+# ElastiCache (Redis) stuff
+###########################
+elasticache_cluster_id              = "{{ elasticache_cluster_id }}"
+elasticache_rg_id                   = "{{ elasticache_rg_id }}"
+elasticache_node_type               = "{{ elasticache_node_type }}"
+elasticache_number_cache_clusters   = "{{ elasticache_number_cache_clusters }}"
+elasticache_password                = "{{ elasticache_password }}"
+
+###################
+# Worker node stuff
+###################
+node_key_name                = "{{ worker_node_key_name }}"
+node_group_name              = "cmx-app-cluster-group-{{ env }}"
+node_public_key              = "{{ worker_node_keypair_public_key }}"
+node_instance_type           = "{{ worker_node_instance_type }}"
+node_asg_min_size            = "{{ worker_node_asg_min_size }}"
+node_asg_max_size            = "{{ worker_node_asg_max_size }}"
+node_volume_size             = 20
+node_bootstrap_args          = "{{ worker_node_bootstrap_args }}"
+application_worker_node_instance_role  = "{{ application_worker_node_instance_role }}"
+
+node_amis = {
+  {% for key, value in node_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+##############
+# Bastion host
+##############
+bastion_instance_type        = "{{ bastion_instance_type }}"
+bastion_host_key_name        = "{{ bastion_host_key_name }}"
+bastion_host_public_key      = "{{ bastion_host_keypair_public_key }}"
+bastion_amis = {
+  {% for key, value in bastion_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+application_bastion_ingress_from_cidr_sgs = [
+  {% for application_bastion_ingress_from_cidr in application_bastion_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ application_bastion_ingress_from_cidr.description }}"
+      "from_port" = "{{ application_bastion_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ application_bastion_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ application_bastion_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in application_bastion_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+application_bastion_ingress_from_sg_sgs = [
+  {% for application_bastion_ingress_from_sg in application_bastion_ingress_from_sg_sgs %}
+    {
+      {% for key, value in application_bastion_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+ingress_bastion_ingress_from_cidr_sgs = [
+  {% for ingress_bastion_ingress_from_cidr in ingress_bastion_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ ingress_bastion_ingress_from_cidr.description }}"
+      "from_port" = "{{ ingress_bastion_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ ingress_bastion_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ ingress_bastion_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in ingress_bastion_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+ingress_bastion_ingress_from_sg_sgs = [
+  {% for ingress_bastion_ingress_from_sg in ingress_bastion_ingress_from_sg_sgs %}
+    {
+      {% for key, value in ingress_bastion_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+############################
+# Application database (RDS)
+############################
+application_database_identifier                       = "{{ application_database_identifier }}"
+application_database_name                             = "{{ application_database_name }}"
+application_database_admin_username                   = "{{ application_database_admin_username }}"
+application_database_size                             = {{ application_database_size }}
+application_database_version                          = "{{ application_database_version }}"
+application_database_instance_class                   = "{{ application_database_instance_class }}"
+application_database_backup_retention_period          = {{ application_database_backup_retention_period }}
+application_database_deletion_protection              = {{ application_database_deletion_protection|lower }}
+application_database_monitoring_interval              = {{ application_database_monitoring_interval }}
+application_database_subnet_group_name                = "{{ application_database_subnet_group_name }}"
+application_database_secret_recovery_window_days      = {{ application_database_secret_recovery_window_days }}
+application_database_multi_az                         = {{ application_database_multi_az|lower }}
+
+application_database_additional_ingress_sgs  = [
+  {% for item in application_database_additional_ingress_sgs %}
+  "{{ item }}",
+  {% endfor %}
+]
+
+application_database_enabled_cloudwatch_logs_exports  = [
+  {% for log_exports in application_database_enabled_cloudwatch_logs_exports %}
+  "{{ log_exports }}",
+  {% endfor %}
+]
+
+application_secrets_kms_key_alias = "{{ application_secrets_kms_key_alias }}"
+
+aws_secret_manager_secret_key_initial_value = "{{ aws_secret_manager_secret_key_initial_value }}"
+aws_secrets_recovery_window_in_days                    = {{ aws_secrets_recovery_window_in_days }}
+
+###########################
+# SNS Topics and SQS Queues
+###########################
+sns_topics = {
+  {% for key, value in sns_topics.items() %}
+    "{{key }}" = {
+      {% for key1, value1 in value.items() %}
+         "{{ key1 }}" = "{{ value1 }}",
+      {% endfor %}
+    }
+  {% endfor %}
+}
+
+sqs_queues = {
+  {% for key, value in sqs_queues.items() %}
+    "{{key }}" = {
+      {% for key1, value1 in value.items() %}
+         "{{ key1 }}" = "{{ value1 }}",
+      {% endfor %}
+    }
+  {% endfor %}
+}
+
+application_sns_topic_kms_key_alias = "{{ application_sns_topic_kms_key_alias }}"
+application_sqs_queue_kms_key_alias = "{{ application_sqs_queue_kms_key_alias }}"
+
+#################
+# Developer stuff
+#################
+developers  = [
+  {% for developer in developers %}
+  {
+    "name" = "{{ developer.name }}",
+    "email" = "{{ developer.email }}"
+  },
+  {% endfor %}
+]
+
+#############
+# Mirth Stuff
+#############
+mirth_role_name = "{{ mirth_role_name }}"
+mirth_database_identifier = "{{ mirth_database_identifier }}"
+mirth_database_name = "{{ mirth_database_name }}"
+mirth_database_admin_username = "{{ mirth_database_admin_username }}"
+mirth_database_size = "{{ mirth_database_size }}"
+mirth_database_version = "{{ mirth_database_version }}"
+mirth_database_instance_class = "{{ mirth_database_instance_class }}"
+mirth_database_backup_retention_period = "{{ mirth_database_backup_retention_period }}"
+mirth_database_deletion_protection = "{{ mirth_database_deletion_protection|lower }}"
+mirth_database_multi_az = {{ mirth_database_multi_az|lower }}
+mirth_database_enabled_cloudwatch_logs_exports = [
+  {% for export in mirth_database_enabled_cloudwatch_logs_exports %}
+  "{{ export }}",
+  {% endfor %}
+]
+mirth_database_monitoring_interval = "{{ mirth_database_monitoring_interval }}"
+mirth_database_subnet_group_name = "{{ mirth_database_subnet_group_name }}"
+mirth_database_secret_recovery_window_days = "{{ mirth_database_secret_recovery_window_days }}"
+mirth_database_username = "{{ mirth_database_username }}"
+mirth_database_secrets_usage_policy_name = "{{ mirth_database_secrets_usage_policy_name }}"
+mirth_database_kms_key_alias = "{{ mirth_database_kms_key_alias }}"
+mirth_database_parameter_group = "{{ mirth_database_parameter_group }}"
+mirth_database_secret_name = "{{ mirth_database_secret_name }}"
+mirth_database_admin_secret_name = "{{ mirth_database_admin_secret_name }}"
+mirth_database_security_group_name = "{{ mirth_database_security_group_name }}"
+mirth_rds_enhanced_monitoring_role_name = "{{ mirth_rds_enhanced_monitoring_role_name }}"
+application_mirthconnect_dns_address = "{{ application_mirthconnect_dns_address }}"
+
+ingress_mirth_role_name = "{{ ingress_mirth_role_name }}"
+ingress_mirth_database_identifier = "{{ ingress_mirth_database_identifier }}"
+ingress_mirth_database_size = "{{ ingress_mirth_database_size }}"
+ingress_mirth_database_instance_class = "{{ ingress_mirth_database_instance_class }}"
+ingress_mirth_database_subnet_group_name = "{{ ingress_mirth_database_subnet_group_name }}"
+ingress_mirth_database_secrets_usage_policy_name = "{{ ingress_mirth_database_secrets_usage_policy_name }}"
+ingress_mirth_database_kms_key_alias = "{{ ingress_mirth_database_kms_key_alias }}"
+ingress_mirth_database_parameter_group = "{{ ingress_mirth_database_parameter_group }}"
+ingress_mirth_database_secret_name = "{{ ingress_mirth_database_secret_name }}"
+ingress_mirth_database_admin_secret_name = "{{ ingress_mirth_database_admin_secret_name }}"
+ingress_mirth_database_security_group_name = "{{ ingress_mirth_database_security_group_name }}"
+ingress_mirth_database_multi_az = {{ ingress_mirth_database_multi_az|lower }}
+ingress_mirth_rds_enhanced_monitoring_role_name = "{{ ingress_mirth_rds_enhanced_monitoring_role_name }}"
+ingress_mirthconnect_dns_address = "{{ ingress_mirthconnect_dns_address }}"
+
+ingress_mirth_amis = {
+  {% for key, value in ingress_mirth_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+ingress_mirth_key_name            = "{{ ingress_mirth_key_name }}"
+ingress_mirth_public_key          = "{{ ingress_mirth_keypair_public_key }}"
+ingress_mirth_instance_type       = "{{ ingress_mirth_instance_type }}"
+
+#######################################
+# Application Data Warehouse (Redshift)
+#######################################
+application_data_warehouse_identifier                     = "{{ application_data_warehouse_identifier }}"
+application_data_warehouse_name                           = "{{ application_data_warehouse_name }}"
+application_data_warehouse_node_type                      = "{{ application_data_warehouse_node_type }}"
+application_data_warehouse_admin_username                 = "{{ application_data_warehouse_admin_username }}"
+application_data_warehouse_snapshot_retention_period      = "{{ application_data_warehouse_snapshot_retention_period }}"
+application_data_warehouse_cluster_version                = "{{ application_data_warehouse_cluster_version }}"
+application_data_warehouse_number_of_nodes                = {{ application_data_warehouse_number_of_nodes }}
+application_data_warehouse_logging_prefix                 = "{{ application_data_warehouse_logging_prefix }}"
+application_data_warehouse_subnet_group_name              = "{{ application_data_warehouse_subnet_group_name }}"
+application_data_warehouse_secret_recovery_window_days    = {{ application_data_warehouse_secret_recovery_window_days }}
+application_data_warehouse_log_bucket_policy_aws_account  = "{{ application_data_warehouse_log_bucket_policy_aws_account }}"
+
+application_data_warehouse_additional_ingress_sgs  = [
+  {% for item in application_data_warehouse_additional_ingress_sgs %}
+  "{{ item }}",
+  {% endfor %}
+]
+application_data_warehouse_additional_ingress_cidr_sgs  = [
+  {% for item in application_data_warehouse_additional_ingress_cidr_sgs %}
+  "{{ item }}",
+  {% endfor %}
+]
+
+{% if application_data_warehouse_snapshot_copy is defined %}
+application_data_warehouse_snapshot_copy  = {
+  "region"            = "{{ application_data_warehouse_snapshot_copy.region }}",
+  "retention_period"  = "{{ application_data_warehouse_snapshot_copy.retention_period }}"
+}
+{% endif %}
+
+###################################
+# Application Elasticsearch Service
+###################################
+application_elasticsearch_domain          = "{{ application_elasticsearch_domain }}"
+application_elasticsearch_version         = "{{ application_elasticsearch_version }}"
+application_elasticsearch_ebs_volume_size = "{{ application_elasticsearch_ebs_volume_size }}"
+application_elasticsearch_instance_type   = "{{ application_elasticsearch_instance_type }}"
+application_elasticsearch_instance_count  = {{ application_elasticsearch_instance_count }}
+application_elasticsearch_dedicated_master_enabled = {{ application_elasticsearch_dedicated_master_enabled|lower }}
+application_elasticsearch_zone_awareness_enabled = {{ application_elasticsearch_zone_awareness_enabled|lower }}
+
+############
+# WAF Stuff
+############
+waf_regional_prefix = "regional"
+
+blacklisted_ips = [
+  {
+    value = "172.16.0.0/16"
+    type  = "IPV4"
+  },
+  {
+    value = "192.168.0.0/16"
+    type  = "IPV4"
+  },
+  {
+    value = "169.254.0.0/16"
+    type  = "IPV4"
+  },
+  {
+    value = "127.0.0.1/32"
+    type  = "IPV4"
+  },
+  # Disable blacklisted local IP addresses which is preventing access from the VPN
+  #{
+  #  value = "10.0.0.0/8"
+  #  type  = "IPV4"
+  #},
+]
+
+admin_remote_ipset = [
+  {
+    value = "127.0.0.1/32"
+    type  = "IPV4"
+  },
+]
+
+acl_constraint_body_size          = "{{ acl_constraint_body_size }}"
+acl_constraint_cookie_size        = "{{ acl_constraint_cookie_size }}"
+acl_constraint_query_string_size  =  "{{ acl_constraint_query_string_size }}"
+acl_constraint_uri_size           =  "{{ acl_constraint_uri_size }}"
+web_admin_url                     =  "{{ web_admin_url }}"
+acl_constraint_match_auth_tokens  = "{{ acl_constraint_match_auth_tokens }}"
+acl_constraint_session_id         = "{{ acl_constraint_session_id }}"
+
+kafka_version                     = "{{ kafka_version }}"
+msk_instance_type                 = "{{ msk_instance_type }}"
+number_of_kafka_broker_nodes      = "{{ number_of_kafka_broker_nodes }}"
+msk_ebs_volume_size               = "{{ msk_ebs_volume_size }}"
+msk_private_subnet_cidr_block  = [
+  {% for cidr_block in msk_private_subnet_cidr_block %}
+  "{{ cidr_block }}",
+  {% endfor %}
+]
+
+emr_release_label   = "{{ emr_release_label }}"
+emr_instance_profile  = "{{ emr_instance_profile }}"
+emr_master_volume_type = "{{ emr_master_volume_type }}"
+emr_master_instance_type = "{{ emr_master_instance_type }}"
+emr_master_instance_group_name = "{{ emr_master_instance_group_name }}"
+emr_core_instance_count_min = "{{  emr_core_instance_count_min  }}"
+emr_core_instance_count_max = "{{  emr_core_instance_count_max  }}"
+emr_core_volume_size_in_gb = "{{  emr_core_volume_size_in_gb }}"
+emr_core_volume_type = "{{ emr_core_volume_type }}"
+emr_core_instance_type = "{{ emr_core_instance_type }}"
+emr_ebs_root_volume_size = "{{ emr_ebs_root_volume_size }}"
+emr_core_instance_group_name = "{{ emr_core_instance_group_name }}"
+
+sns_source_addresses = [
+  {% for addr in sns_source_addresses %}
+  "{{ addr }}",
+  {% endfor %}
+]
+
+#################
+# Data Lake stuff
+#################
+emr_subnet_cidr_block = "{{ emr_subnet_cidr_block }}"
+emr_spark_certs_file_path = "{{ emr_spark_certs_file_path }}"
+kafka_avail_zone_distribution = "{{ kafka_avail_zone_distribution }}"
+kafka_enhanced_monitoring = "{{ kafka_enhanced_monitoring }}"
+data_lake_emr_host_key_name = "{{ data_lake_emr_host_key_name }}"
+data_lake_emr_host_public_key = "{{ data_lake_emr_host_keypair_public_key }}"
+data_lake_additional_users = [
+  {% for user in data_lake_additional_users %}
+  "{{ user }}",
+  {% endfor %}
+]
+
+##########################
+# Security Tool Related!
+##########################
+app_vpc_flow_log_group_name        = "{{ app_vpc_flow_log_group_name }}"
+app_vpc_flow_log_traffic_type      = "{{ app_vpc_flow_log_traffic_type }}"
+ingress_vpc_flow_log_group_name    = "{{ ingress_vpc_flow_log_group_name }}"
+ingress_vpc_flow_log_traffic_type  = "{{ ingress_vpc_flow_log_traffic_type }}"
+aws_inspector_enabled              = "{{ aws_inspector_enabled }}"
+inspector_schedule_expression      = "{{ inspector_schedule_expression }}"
+inspector_assessment_duration      = "{{ inspector_assessment_duration }}"
+ruleset_cve                        = "{{ ruleset_cve|lower }}"
+ruleset_cis                        = "{{ ruleset_cis|lower }}"
+ruleset_security_best_practices    = "{{ ruleset_security_best_practices|lower }}"
+ruleset_network_reachability       = "{{ ruleset_network_reachability|lower }}"
+inspector_enable_scheduled_event   = "{{ inspector_enable_scheduled_event|lower }}"
+aws_inspector_ruleset_region       = "{{ aws_inspector_ruleset_region }}"
+aws_ruleset_account_id              = "{{ aws_ruleset_account_id }}"
+aws_ruleset_cve_id                 = "{{ aws_ruleset_cve_id }}"
+aws_ruleset_cis_id                 = "{{ aws_ruleset_cis_id }}"
+ruleset_security_best_practices_id = "{{ ruleset_security_best_practices_id }}"
+ruleset_network_reachability_id    = "{{ ruleset_network_reachability_id }}"
+
+guardduty_detector_enable = "{{ guardduty_detector_enable|lower }}"
+
+guardduty_master_account_id    = "{{ guardduty_master_account_id }}"
+emr_bootstrap_action_name      = "{{ emr_bootstrap_action_name }}"
+emr_bootstrap_script_file_path = "{{ emr_bootstrap_script_file_path }}"
+
+aws_foundations_securityhub_standards_subscription_arn = "{{ aws_foundations_securityhub_standards_subscription_arn }}"
+aws_securityhub_product_subscription_arn               = "{{ aws_securityhub_product_subscription_arn }}"
+
+###########
+# New Relic
+###########
+new_relic_temporary_license_key = "{{ new_relic_temporary_license_key }}"
+
+##########################
+# Customer Specific stuff!
+##########################
+partners_vpn_secret_recovery_window_days = "{{ partners_vpn_secret_recovery_window_days }}"
+partners_ingress_open_ports = [
+  {% for partners_ingress_open_port in partners_ingress_open_ports %}
+  "{{ partners_ingress_open_port }}",
+  {% endfor %}
+]
+
+cumedicine_vpn_secret_recovery_window_days = "{{ cumedicine_vpn_secret_recovery_window_days }}"
+cumedicine_ingress_open_ports = [
+  {% for cumedicine_ingress_open_port in cumedicine_ingress_open_ports %}
+  "{{ cumedicine_ingress_open_port }}",
+  {% endfor %}
+]
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+cloud_watch_ingest_to_elasticsearch_log_groups  = {
+  {% for key, value in cloud_watch_ingest_to_elasticsearch_log_groups.items() %}
+    "{{ key }}" = {
+      {% for key1, value1 in value.items() %}
+       "{{ key1 }}" = "{{ value1 }}"
+       {% endfor %}
+     }
+  {% endfor %}
+}
+
+firehose_lambda_function_dir = "{{ firehose_lambda_function_dir }}"
+log_subscription_filter_distribution = "{{ log_subscription_filter_distribution }}"
+kinesis_rentention_period = "{{ kinesis_rentention_period }}"
+kinesis_stream_kms_key_alias = "{{ kinesis_stream_kms_key_alias }}"
+
+firehose_lambda_runtime_type = "{{ firehose_lambda_runtime_type }}"
+firehose_cloudwatch_log_retention = "{{ firehose_cloudwatch_log_retention }}"
+firehose_lambda_function_timeout = "{{ firehose_lambda_function_timeout }}"
+firehose_elasticsearch_configuration_buffering_interval = "{{ firehose_elasticsearch_configuration_buffering_interval }}"
+firehose_elasticsearch_configuration_buffering_size = "{{ firehose_elasticsearch_configuration_buffering_size }}"
+firehose_s3_backup_bucket_configuration_buffering_interval = "{{ firehose_s3_backup_bucket_configuration_buffering_interval }}"
+firehose_s3_backup_bucket_configuration_buffering_size = "{{ firehose_s3_backup_bucket_configuration_buffering_size }}"
+firehose_s3_backup_bucket_configuration_prefix = "{{ firehose_s3_backup_bucket_configuration_prefix }}"
+firehose_s3_config_cloudwatch_logging_options_enabled = "{{ firehose_s3_config_cloudwatch_logging_options_enabled|lower }}"
+firehose_s3_config_cloudwatch_logging_options_log_group_name= "{{ firehose_s3_config_cloudwatch_logging_options_log_group_name }}"
+firehose_s3_config_cloudwatch_logging_options_log_stream_name = "{{ firehose_s3_config_cloudwatch_logging_options_log_stream_name }}"
+firehose_elasticsearch_configuration_index_rotation_period = "{{ firehose_elasticsearch_configuration_index_rotation_period }}"
+firehose_elasticsearch_configuration_s3_backup_mode = "{{ firehose_elasticsearch_configuration_s3_backup_mode }}"
+firehose_record_lambda_func_processing_configuration_enabled = "{{ firehose_record_lambda_func_processing_configuration_enabled|lower }}"
+firehose_record_processors_type = "{{ firehose_record_processors_type }}"
+firehose_processor_parameter_name = "{{ firehose_processor_parameter_name }}"
+###################################################################
+#  End of CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+###################################################################
+###################################################################
+#  CloudWatch Alarm -> SNS Topic -> User Email
+###################################################################
+free_storage_metrix_name = "{{ free_storage_metrix_name }}"
+percentage_disk_space_used_metrix_name = "{{percentage_disk_space_used_metrix_name }}"
+less_than_or_equal_to_comparison_operator = "{{ less_than_or_equal_to_comparison_operator }}"
+greater_than_comparison_operator = "{{ greater_than_comparison_operator }}"
+statistic_period = "{{ statistic_period }}"
+
+treat_missing_data   = {
+  {% for key, value in treat_missing_data.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+cloudwatch_alarm_namespace  = {
+  {% for key, value in cloudwatch_alarm_namespace.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+low_storage_space_cloudwatch_alarm  = {
+  {% for key, value in low_storage_space_cloudwatch_alarm.items() %}
+  "{{ key }}" = {
+      {% if value is mapping %}
+        {% for key1, value1 in value.items() %}
+          "{{ key1 }}" = {
+             {% for key2, value2 in value1.items() %}
+               "{{ key2 }}" = "{{ value2 }}"
+             {% endfor %}
+          }
+        {% endfor %}
+      {% endif %}
+   }
+  {% endfor %}
+}
+
+ingress_mirth_alarms_enabled = {{ ingress_mirth_alarms_enabled|lower }}
+ingress_mirth_liveness_threshold = {{ ingress_mirth_liveness_threshold }}
+ingress_mirth_network_throughput_threshold = {{ ingress_mirth_network_throughput_threshold }}
+customer_networking_csr_1_liveness_threshold = {{ customer_networking_csr_1_liveness_threshold }}
+customer_networking_csr_1_network_throughput_threshold = {{ customer_networking_csr_1_network_throughput_threshold }}
+
+activitylog_queue_alarm_count_threshold = {{ activitylog_queue_alarm_count_threshold }}
+activitylog_queue_alarm_minutes = {{ activitylog_queue_alarm_minutes }}
+casebuilder_queue_alarm_count_threshold = {{ casebuilder_queue_alarm_count_threshold }}
+casebuilder_queue_alarm_minutes = {{ casebuilder_queue_alarm_minutes }}
+casebuilder_deadletter_queue_alarm_count_threshold = {{ casebuilder_deadletter_queue_alarm_count_threshold }}
+casebuilder_deadletter_queue_alarm_minutes = {{ casebuilder_deadletter_queue_alarm_minutes }}
+caseevents_queue_alarm_count_threshold = {{ caseevents_queue_alarm_count_threshold }}
+caseevents_queue_alarm_minutes = {{ caseevents_queue_alarm_minutes }}
+caseevents_deadletter_queue_alarm_count_threshold = {{ caseevents_deadletter_queue_alarm_count_threshold }}
+caseevents_deadletter_queue_alarm_minutes = {{ caseevents_deadletter_queue_alarm_minutes }}
+charge_processor_queue_alarm_count_threshold = {{ charge_processor_queue_alarm_count_threshold }}
+charge_processor_queue_alarm_minutes = {{ charge_processor_queue_alarm_minutes }}
+charge_processor_deadletter_queue_alarm_count_threshold = {{ charge_processor_deadletter_queue_alarm_count_threshold }}
+charge_processor_deadletter_queue_alarm_minutes = {{ charge_processor_deadletter_queue_alarm_minutes }}
+externaltaskmonitor_queue_alarm_count_threshold = {{ externaltaskmonitor_queue_alarm_count_threshold }}
+externaltaskmonitor_queue_alarm_minutes = {{ externaltaskmonitor_queue_alarm_minutes }}
+munotification_queue_alarm_count_threshold = {{ munotification_queue_alarm_count_threshold }}
+munotification_queue_alarm_minutes = {{ munotification_queue_alarm_minutes }}
+
+datawarehouse_msk_broker_disk_use_threshold = {{ datawarehouse_msk_broker_disk_use_threshold }}
+
+###################################################################
+#  End of CloudWatch Alarm -> SNS Topic -> User Email
+###################################################################
+
+###################################################################
+#  Enable KMS key rotation
+###################################################################
+enable_key_rotation = "{{ enable_key_rotation|lower }}"
+
+###################################################################
+#  Enable additional traffic ports to ingress mirth
+###################################################################
+ingress_mirth_additional_open_ports = [
+  {% for ingress_mirth_additional_open_port in ingress_mirth_additional_open_ports %}
+  "{{ ingress_mirth_additional_open_port }}",
+  {% endfor %}
+]
+
+###################################################################
+#  Enable traffic ports from app to ingress mirth
+###################################################################
+app_mirth_to_ingress_mirth_open_ports = [
+  {% for mirth_ingress_open_port in app_mirth_to_ingress_mirth_open_ports %}
+  "{{ mirth_ingress_open_port }}",
+  {% endfor %}
+]
+
+#############################################################
+# Application cmx-automate-ingress (external) K8S Ingress/ALB
+#############################################################
+cmx_automate_ingress_from_cidr_sgs = [
+  {% for cmx_automate_ingress_from_cidr in cmx_automate_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ cmx_automate_ingress_from_cidr.description }}"
+      "from_port" = "{{ cmx_automate_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ cmx_automate_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ cmx_automate_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in cmx_automate_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+cmx_automate_ingress_from_sg_sgs = [
+  {% for cmx_automate_ingress_from_sg in cmx_automate_ingress_from_sg_sgs %}
+    {
+      {% for key, value in cmx_automate_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+#############################################
+# Application cmx-api-ingress K8S Ingress/ALB
+#############################################
+application_cmx_api_ingress_from_cidr_sgs = [
+  {% for application_cmx_api_ingress_from_cidr in application_cmx_api_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ application_cmx_api_ingress_from_cidr.description }}"
+      "from_port" = "{{ application_cmx_api_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ application_cmx_api_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ application_cmx_api_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in application_cmx_api_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+application_cmx_api_ingress_from_sg_sgs = [
+  {% for application_cmx_api_ingress_from_sg in application_cmx_api_ingress_from_sg_sgs %}
+    {
+      {% for key, value in application_cmx_api_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+#######################################################
+# Application cmx-mirth-connect-api-ingress K8S Ingress/ALB
+#######################################################
+application_mirth_connect_api_ingress_from_cidr_sgs = [
+  {% for application_mirth_connect_api_ingress_from_cidr in application_mirth_connect_api_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ application_mirth_connect_api_ingress_from_cidr.description }}"
+      "from_port" = "{{ application_mirth_connect_api_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ application_mirth_connect_api_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ application_mirth_connect_api_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in application_mirth_connect_api_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+application_mirth_connect_api_ingress_from_sg_sgs = [
+  {% for application_mirth_connect_api_ingress_from_sg in application_mirth_connect_api_ingress_from_sg_sgs %}
+    {
+      {% for key, value in application_mirth_connect_api_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+#######################################################
+# Ingress cmx-mirth-connect-api-ingress K8S Ingress/ALB
+#######################################################
+ingress_mirth_connect_api_ingress_from_cidr_sgs = [
+  {% for ingress_mirth_connect_api_ingress_from_cidr in ingress_mirth_connect_api_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ ingress_mirth_connect_api_ingress_from_cidr.description }}"
+      "from_port" = "{{ ingress_mirth_connect_api_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ ingress_mirth_connect_api_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ ingress_mirth_connect_api_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in ingress_mirth_connect_api_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+ingress_mirth_connect_api_ingress_from_sg_sgs = [
+  {% for ingress_mirth_connect_api_ingress_from_sg in ingress_mirth_connect_api_ingress_from_sg_sgs %}
+    {
+      {% for key, value in ingress_mirth_connect_api_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+
+# Backing up indices of elasticsearch to s3 bucket
+elasticsearch_index_rotation   = {
+  {% for key, value in elasticsearch_index_rotation.items() %}
+    "{{ key }}" = {
+      {% for key1, value1 in value.items() %}
+        {% if key1 == "indices" %}
+           "{{ key1 }}" = "[ {% for item in value1 %}  {  {% for key2, value2 in item.items() %}  '{{ key2 }}' : '{{ value2 }}',   {% endfor %}     },   {% endfor %}]"
+        {% else %}
+          "{{ key1 }}" = "{{ value1 }}",
+        {% endif %}
+      {% endfor %}
+    }
+  {% endfor %}
+}
+
+elasticsearch_index_rotation_lambda  = {
+  {% for key, value in elasticsearch_index_rotation_lambda.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+####################
+# S3 Lifecycle Rules
+####################
+s3_lifecycle_incomplete_upload_days = {{ s3_lifecycle_incomplete_upload_days }}
+s3_lifecycle_logs_expiration_days = {{ s3_lifecycle_logs_expiration_days }}
+s3_lifecycle_old_version_expiration_days = {{ s3_lifecycle_old_version_expiration_days }}
+s3_lifecycle_intelligent_tiering_days = {{ s3_lifecycle_intelligent_tiering_days }}

@@ -1,0 +1,19 @@
+# Peering connections for the production environment
+
+application_peer_vpc_routes:
+  - pcx_name: DataCentral3-CMXProductionApplication # Data Central 3 <-> Production Application
+    destination_cidr: 10.73.0.0/16
+  - pcx_name: CMXProductionApp-CMXProductionIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.60.0.0/16
+  - pcx_name: ToolsNet-CMXProduction # Tools Network <-> Production
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: ACTProduction-CMXProductionApplication
+    destination_cidr: 10.1.0.0/16
+
+ingress_peer_vpc_routes:
+  - pcx_name: CMXOnboardingIngress-CMXProductionIngress # Onboarding Ingress -> Production Ingress
+    destination_cidr: 10.54.0.0/16
+  - pcx_name: CMXProductionApp-CMXProductionIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.59.0.0/16
+  - pcx_name: ToolsNet-CMXProductionIngress # Tools Network <-> Production Ingress
+    destination_cidr: "{{ codametrix_tools_cidr }}"

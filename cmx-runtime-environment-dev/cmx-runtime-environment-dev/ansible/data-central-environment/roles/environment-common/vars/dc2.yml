@@ -1,0 +1,121 @@
+---
+shortenv: "dc2"
+region: us-east-1
+management_bucket: management.cmxdatacentral.codametrix.com
+aws_account_name: cmxdatacentral
+
+# AWS CodaMetrix Data Central account
+aws_account_id: "876690251215"
+ip_range_prefix: "10.72"
+
+bastion_amis:
+  us-east-1: ami-0e2422dd86609928b
+
+dundas_amis:
+  us-east-1: ami-0e7f7a54aac5cb2c1
+
+# DC1 created these source credentials, this environment will use them
+dundas_ses_source_credentials_secret_name: CodaMetrixDataCentral/Dundas/SES/dc1-{{ dundas_ses_identity }}
+
+dundas_instance_type: c5.2xlarge
+dundas_keypair_public_key: ""
+
+# Dundas database parameters
+dundas_application_database_size: 256
+dundas_application_database_version: "11.8"
+dundas_application_database_instance_class: "db.m5.2xlarge"
+dundas_application_database_backup_retention_period: 14
+dundas_application_database_deletion_protection: false
+dundas_application_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+dundas_application_database_monitoring_interval: 30
+dundas_application_database_secret_recovery_window_days: 0
+
+# Dundas warehouse database parameters
+dundas_warehouse_database_size: 1600
+dundas_warehouse_database_version: "11.8"
+dundas_warehouse_database_instance_class: "db.m5.2xlarge"
+dundas_warehouse_database_backup_retention_period: 3
+dundas_warehouse_database_deletion_protection: false
+dundas_warehouse_database_enabled_cloudwatch_logs_exports: []
+dundas_warehouse_database_monitoring_interval: 30
+dundas_warehouse_database_secret_recovery_window_days: 0
+
+shared_resource_tags:
+  BillingCategory: Application
+  BillingTeam: Engineering
+  BillingEnvironment: Testing
+  BillingApplication: CMx
+  Environment: "{{ env }}"
+  Usage: CodaMetrix Data Central
+
+aws_secrets_recovery_window_in_days: 7
+
+# Bastion parameters
+bastion_instance_type: t2.micro
+
+# Guard Duty
+guardduty_detector_enable: false
+is_guardduty_member: false
+
+####################
+#  CloudWatch Alarms
+####################
+low_storage_space_cloudwatch_alarm:
+  rds:
+    dundas-application-db:
+      name: dundas-application-db
+      db_identifier: "{{ dundas_application_database_identifier }}"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes, set to 64 Gigabytes (total volume size is 256 GB)
+      free_storage_space_threshold: 68719476736
+      unit: Bytes
+    dundas-warehouse-db:
+      name: dundas-warehouse-db
+      db_identifier: "{{ dundas_warehouse_database_identifier }}"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes, set to 400 Gigabytes (total volume size is 1600 GB)
+      free_storage_space_threshold: 429496729600
+      unit: Bytes
+
+##############################
+# Security groups
+##############################
+# Allow access to the Dundas ALB from the CodaMetrix Tools VPN and Development
+alb_dundas_ingress_from_sg_sgs:
+  - description: Allow HTTPS access from the CodaMetrix Tools VPN
+    from_port: 443
+    to_port: 443
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"
+  - description: Allow HTTP access from the CodaMetrix Tools VPN
+    from_port: 80
+    to_port: 80
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"
+alb_dundas_ingress_from_cidr_sgs:
+  - description: Allow HTTPS access from Development
+    from_port: 443
+    to_port: 443
+    protocol: tcp
+    cidr_blocks: ["10.51.0.0/16"]
+  - description: Allow HTTP access from Development
+    from_port: 80
+    to_port: 80
+    protocol: tcp
+    cidr_blocks: ["10.51.0.0/16"]
+  - description: Allow HTTPS access from QA1
+    from_port: 443
+    to_port: 443
+    protocol: tcp
+    cidr_blocks: ["10.55.0.0/16"]
+  - description: Allow HTTP access from QA1
+    from_port: 80
+    to_port: 80
+    protocol: tcp
+    cidr_blocks: ["10.55.0.0/16"]

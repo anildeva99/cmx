@@ -1,0 +1,264 @@
+---
+# CodaMetrix account ID (standard ECR repository location)
+codametrix_tools_account_id: "643073444324"
+sso_login_account_id: "643073444324"
+
+# CodaMetrix Tools environment stuff
+codametrix_tools_vpn_sg: "sg-048b872f81382cb63"
+codametrix_tools_dundas_sg: "sg-02a135d30f65c856c"
+codametrix_cqa_instance_sg: "sg-0927255d6d531ba4d"
+codametrix_tools_cidr: "10.11.0.0/16"
+
+# DR related vars
+dr_environment: ""
+dr_region: "us-west-2"
+enable_s3_replication: false
+enable_rds_replication: false
+
+# CodaMetrix Data Central environment stuff
+datacentral1_dundas_sg: "sg-071f64aad8df7cf3c"
+
+# ACT environment stuff
+act_stage_codeprediction_worker_sg: "sg-b0c59fc8"
+act_production_codeprediction_worker_sg: "sg-472e093f"
+
+application_peer_vpc_routes: []
+ingress_peer_vpc_routes: []
+
+# Kubernetes installed version
+cluster_k8s_version: 1.16
+
+# Defaults for additional sgs lists
+application_data_warehouse_additional_ingress_sgs: []
+application_data_warehouse_additional_ingress_cidr_sgs: []
+application_database_additional_ingress_sgs: []
+
+# Enable cluster bastion host?
+enable_cluster_bastion: false
+
+# Internally or Externally facing ingress load balancer
+cmx_automate_ingress_lb_internal: true
+cmx_api_ingress_lb_internal: true
+
+# Enable Cisco CSRs for customer networking?
+enable_customer_networking: false
+
+# Enable New Relic Java agent
+enable_newrelic_java_agent: true
+
+# New Relic settings
+newrelic_java_app_name: CMX Platform
+newrelic_java_agent_high_security: true
+newrelic_java_agent_log_level: "info"
+
+enable_java_debugger: false
+enable_idle_mode: false
+enable_java_profiler: false
+deploy_service: "*"
+
+# Health Systems
+healthsystems:
+  - chs # University of Colorado Healthsystem
+  - phs # MGB (formerly Partners)
+  - amc # AMC Healthsystem (Demo Tenant)
+
+# Tenants
+tenants:
+  uch: chs
+  chco: chs
+  cumed: chs
+  mgh: phs
+  pma: phs
+  puc: phs
+  mvh: phs
+  cdh: phs
+  nsmc: phs
+  nwh: phs
+  nch: phs
+  srh: phs
+  bwh: phs
+  fh: phs
+  dfci: phs
+  mgpo: phs
+  bwpo: phs
+  veracode: phs
+  wdh: phs
+  meei: phs
+  city: amc  # City Hospital (Demo)
+  metro: amc # Metro Hosptial (Demo)
+
+services:
+  - caseservice
+  - claimservice
+  - configurationservice
+  - dashboardui
+  - dictionaryservice
+  - documentationservice
+  - eventdispatcherservice
+  - importerservice
+  - orderservice
+  - patientservice
+  - userservice
+  - processservice
+  - musagemakerservice
+  - exporterservice
+  - monitorservice
+
+# Application will use database called 'codametrix' and admin user 'root'
+application_database_admin_username: root
+application_database_backup_retention_period: 7
+application_database_deletion_protection: true
+application_database_enabled_cloudwatch_logs_exports: []
+application_database_instance_class: db.t3.medium
+application_database_monitoring_interval: 30
+application_database_multi_az: false
+application_database_name: codametrix
+application_database_secret_recovery_window_days: 30
+application_database_size: 10
+application_database_version: "11.10"
+
+# Mirth will use database called 'mirthdb' and admin
+# user 'root', application user 'mirthdb'
+mirth_database_admin_username: root
+mirth_database_backup_retention_period: 7
+mirth_database_deletion_protection: true
+mirth_database_enabled_cloudwatch_logs_exports: []
+mirth_database_instance_class: db.t3.small
+mirth_database_monitoring_interval: 30
+mirth_database_multi_az: false
+mirth_database_name: mirthdb
+mirth_database_schema_name: mirth
+mirth_database_secret_recovery_window_days: 30
+mirth_database_size: 10
+mirth_database_username: mirthdb
+mirth_database_version: "11.10"
+mirth_db_max_connections: 100
+
+# Mirth database max connecctions
+ingress_mirth_database_instance_class: db.t3.small
+ingress_mirth_database_multi_az: false
+ingress_mirth_database_size: 10
+ingress_mirth_db_max_connections: 100
+
+# Camunda max pool size possible
+# NOTE: All camunda values are set to 50% of
+# tomcat_db_connection_pool.db_max_active or limited to
+# camunda_max_pool_size_possible if 50% of db_max_active >
+# camunda_max_pool_size_possible
+camunda_max_pool_size_possible: 20
+
+# Application will have a master data warehouse db called
+# 'codametrix' and admin user 'root'
+application_data_warehouse_name: codametrix
+application_data_warehouse_admin_username: root
+
+container_ports:
+  cmx_case_builder_service: 7079
+  cmx_claim_service: 9970
+  cmx_cluster_bastion: 22
+  cmx_configuration_service: 7073
+  cmx_dashboard_ui: 80
+  cmx_dictionary_service: 9970
+  cmx_documentation_service: 9292
+  cmx_event_dispatcher_service: 7078
+  cmx_importer_service: 7077
+  cmx_mirth: 8443
+  cmx_order_service: 9970
+  cmx_patient_service: 9970
+  cmx_user_service: 7071
+  cmx_process_service: 7231
+  cmx_exporter_service: 7073
+  mu_sagemaker_service: 80
+  cmx_monitor_service: 9980
+
+service_ports:
+  cmx_case_builder_service: 80
+  cmx_claim_service: 80
+  cmx_cluster_bastion: 22
+  cmx_configuration_service: 80
+  cmx_dashboard_ui: 80
+  cmx_dictionary_service: 80
+  cmx_documentation_service: 80
+  cmx_event_dispatcher_service: 80
+  cmx_importer_service: 80
+  cmx_mirth: 8443
+  cmx_order_service: 80
+  cmx_patient_service: 80
+  cmx_user_service: 80
+  cmx_process_service: 80
+  mu_sagemaker_service: 80
+  cmx_exporter_service: 80
+  cmx_monitor_service: 80
+
+rds_certificate_bundle_url: https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
+rds_certificate_bundle_path: /usr/local/share/ca-certificates/rds-combined-ca-bundle.crt
+
+terraform_path: ../../terraform/application-environment
+keypair_terraform_path: ../../terraform/application-ssh-keypair
+
+worker_node_bootstrap_args: "--kubelet-extra-args '--node-labels=kubernetes.io/os=linux'"
+
+# Override to 'true' to force terraform initialization
+force_init: true
+
+# Elasticache
+elasticache_node_type: cache.t3.micro
+elasticache_number_cache_clusters: 2
+
+# Elasticsearch
+application_elasticsearch_version: "7.1"
+application_elasticsearch_instance_type: t3.small.elasticsearch
+application_elasticsearch_instance_count: 1
+application_elasticsearch_ebs_volume_size: 10
+application_elasticsearch_dedicated_master_enabled: false
+application_elasticsearch_zone_awareness_enabled: false
+
+kubernetes_external_secrets_image: godaddy/kubernetes-external-secrets
+kubernetes_external_secrets_image_version: "1.3.0"
+
+aws_alb_ingress_controller_image: docker.io/amazon/aws-alb-ingress-controller
+aws_alb_ingress_controller_version: "v1.1.3"
+
+letsencrypt_notification_email: devops@codametrix.com
+
+# Cert Manager
+cert_manager_version: 0.15.2
+
+# Metrics Server
+metrics_server_version: 0.3.6
+
+# Istio Installation
+istio_version: 1.2.10
+
+# Override with /dev/stdout to enable istio access logging
+istio_access_log_file: ""
+#istio_access_log_file: /dev/stdout
+
+# Dundas
+create_dundas_service_entry: false
+dundas_address: ""
+
+# Dictionary UI
+dictionary_ui_enabled: false
+
+# Vitalware
+vitalware_enabled: false
+
+# Defaults for various user lists
+developers: []
+ops_users: []
+bastion_additional_users: []
+database_additional_users: []
+database_superusers: []
+data_warehouse_additional_users: []
+data_warehouse_additional_rw_users: []
+data_warehouse_additional_superusers: []
+data_lake_additional_users: []
+
+###################################################
+#  Traffic from other places to Ingress mirth
+###################################################
+ingress_mirth_additional_open_ports: []
+
+# Mirth
+mirth_processing_indicator: T

@@ -1,0 +1,9 @@
+---
+# Peering connections for the tc1 environment
+peer_vpc_routes:
+  - pcx_name: CMXTC1-CMXProductionIngress # TC1 <-> Production Ingress
+    destination_cidr: 10.60.0.0/16
+  - pcx_name: CMXTC1-CMXOnboardingIngress # TC1 <-> Onboarding Ingress
+    destination_cidr: 10.54.0.0/16
+  - pcx_name: ToolsNet-CMXTC1 # Tools Network <-> TC1
+    destination_cidr: "{{ codametrix_tools_cidr }}"

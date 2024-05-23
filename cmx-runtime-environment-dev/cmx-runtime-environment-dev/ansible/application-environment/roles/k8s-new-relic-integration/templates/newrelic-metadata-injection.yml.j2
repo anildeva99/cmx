@@ -1,0 +1,212 @@
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/job.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nri-bundle-nri-metadata-injection-job
+  namespace: new-relic
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+spec:
+  template:
+    metadata:
+      namespace: new-relic
+    spec:
+      serviceAccountName: nri-bundle-nri-metadata-injection
+      containers:
+      - name: nri-metadata-injection-job
+        # This is a minimal kubectl image based on Alpine Linux that sings certificates using the k8s extension api server
+        image: "newrelic/k8s-webhook-cert-manager:1.1.1"
+        imagePullPolicy: "IfNotPresent"
+        command: ["./generate_certificate.sh"]
+        args:
+          - "--service"
+          - nri-bundle-nri-metadata-injection
+          - "--webhook"
+          - nri-bundle-nri-metadata-injection
+          - "--secret"
+          - nri-bundle-nri-metadata-injection
+          - "--namespace"
+          - new-relic
+        resources:
+          limits:
+            cpu: 1
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+      restartPolicy: Never
+  backoffLimit: 1
+
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/mutationwebhookconfiguration.yaml
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: nri-bundle-nri-metadata-injection
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+webhooks:
+- name: metadata-injection.newrelic.com
+  clientConfig:
+    service:
+      name: nri-bundle-nri-metadata-injection
+      namespace: new-relic
+      path: "/mutate"
+    caBundle: ""
+  rules:
+  - operations: [ "CREATE" ]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+  failurePolicy: Ignore
+
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nri-bundle-nri-metadata-injection
+  namespace: new-relic
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nri-bundle-nri-metadata-injection
+  namespace: new-relic
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nri-metadata-injection
+  template:
+    metadata:
+      namespace: new-relic
+      labels:
+        app.kubernetes.io/name: nri-metadata-injection
+        helm.sh/chart: nri-metadata-injection-1.0.0
+        app.kubernetes.io/instance: nri-bundle
+        app.kubernetes.io/version: "1.1.1"
+    spec:
+      serviceAccountName: nri-bundle-nri-metadata-injection
+      containers:
+      - name: nri-metadata-injection
+        image: "newrelic/k8s-metadata-injection:1.1.1"
+        imagePullPolicy: "IfNotPresent"
+        env:
+        - name: clusterName
+          value: arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}
+        volumeMounts:
+        - name: tls-key-cert-pair
+          mountPath: /etc/tls-key-cert-pair
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 1
+          periodSeconds: 1
+        resources:
+          limits:
+            cpu: 1
+            memory: 80M
+          requests:
+            cpu: 100m
+            memory: 30M
+
+      volumes:
+      - name: tls-key-cert-pair
+        secret:
+          secretName: nri-bundle-nri-metadata-injection
+
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nri-bundle-nri-metadata-injection
+  namespace: new-relic
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nri-bundle-nri-metadata-injection
+subjects:
+  - kind: ServiceAccount
+    name: nri-bundle-nri-metadata-injection
+    namespace: new-relic
+
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nri-bundle-nri-metadata-injection
+  namespace: new-relic
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+rules:
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    verbs: ["get", "create", "patch"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests/approval"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+
+
+---
+# Source: nri-bundle/charts/nri-metadata-injection/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nri-bundle-nri-metadata-injection
+  namespace: new-relic
+  labels:
+    app.kubernetes.io/name: nri-metadata-injection
+    helm.sh/chart: nri-metadata-injection-1.0.0
+    app.kubernetes.io/instance: nri-bundle
+    app.kubernetes.io/version: "1.1.1"
+spec:
+  ports:
+  - port: 443
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: nri-metadata-injection

@@ -1,0 +1,460 @@
+---
+shortenv: "dev"
+region: us-east-1
+cmx_automate_dns_name: development.codametrix.ai
+management_bucket: management.development.app.vobasolutions.com
+region_specific_elb_hosted_zone_id: Z35SXDOTRQ7X7K
+
+# AWS Voba Development account
+aws_account_name: legacydevelopment
+aws_account_id: "109882322034"
+ip_range_prefix: "10.51"
+ingress_ip_range_prefix: "10.52"
+
+application_database_additional_ingress_sgs:
+  - "{{ codametrix_tools_dundas_sg }}"
+
+# !!! Remove this and replace with our own sagemaker-data bucket
+sagemaker_data_bucket: sagemaker.development.mu.codametrix.com
+sagemaker_data_key_alias: MuDevelopmentResources-development-sagemaker_kms_key
+sagemaker_data_key_alias_arn: "arn:aws:kms:{{ region }}:{{ aws_account_id }}:alias/{{ sagemaker_data_key_alias }}"
+
+# Dundas
+dundas_enabled: true
+dundas_server_url: "https://www.development.application.codametrix.com/dundasbi/"
+dundas_filesystem_id: "62725ee9-2630-421c-b9e1-07dc2b1b8869"
+create_dundas_service_entry: true
+dundas_address: dundas.dc2.datacentral.codametrix.com
+
+# Dictionary UI
+dictionary_ui_enabled: true
+
+datacentral2_dundas_sg: sg-019ead7a7801b1c72
+application_data_warehouse_additional_ingress_sgs:
+  - "{{ datacentral2_dundas_sg }}"
+  - "{{ codametrix_tools_dundas_sg }}"
+
+shared_resource_tags:
+  BillingCategory: Application
+  BillingTeam: Engineering
+  BillingEnvironment: Testing
+  BillingApplication: CMx
+  Environment: "{{ env }}"
+  Usage: CodaMetrix Application
+
+# Recovery Window for AWS Secrets
+aws_secrets_recovery_window_in_days: 0
+
+# Enable cluster bastion?
+enable_cluster_bastion: true
+
+# Latest CodaMetrix Runtime Environment EKS version 1.16 AMI's
+node_amis:
+  us-east-1: ami-05edbc8bf939cb951
+
+# CodaMetrix Runtime Environment Bastion version 1.1 AMI's
+bastion_amis:
+  us-east-1: ami-05ecda644415c5a01
+
+# Ingress Mirth AMIs (Ubuntu 18.04 LTS, [October, 2020])
+ingress_mirth_amis:
+  us-east-1: ami-037ac871d8ec42412
+
+cmx_case_builder_service_spring_profile: dev
+cmx_case_builder_service_image_pull_policy: Always
+cmx_claim_service_spring_profile: dev
+cmx_claim_service_image_pull_policy: Always
+cmx_configuration_service_spring_profile: dev
+cmx_configuration_service_image_pull_policy: Always
+cmx_dashboard_ui_image_pull_policy: Always
+cmx_dictionary_service_spring_profile: dev
+cmx_dictionary_service_image_pull_policy: Always
+cmx_documentation_service_spring_profile: dev
+cmx_documentation_service_image_pull_policy: Always
+cmx_event_dispatcher_service_spring_profile: dev
+cmx_event_dispatcher_service_image_pull_policy: Always
+cmx_importer_service_spring_profile: dev
+cmx_importer_service_image_pull_policy: Always
+cmx_order_service_spring_profile: dev
+cmx_order_service_image_pull_policy: Always
+cmx_patient_service_spring_profile: dev
+cmx_patient_service_image_pull_policy: Always
+cmx_user_service_spring_profile: dev
+cmx_user_service_image_pull_policy: Always
+cmx_cluster_bastion_image_pull_policy: Always
+cmx_mirth_image_pull_policy: Always
+cmx_process_service_spring_profile: dev
+cmx_process_service_image_pull_policy: Always
+mu_sagemaker_service_spring_profile: default
+mu_sagemaker_service_image_pull_policy: Always
+cmx_exporter_service_spring_profile: dev
+cmx_exporter_service_image_pull_policy: Always
+
+###############################
+# Application service resources
+###############################
+case_builder_service_min_container_memory: "1Gi"
+case_builder_service_max_container_memory: "2Gi"
+case_builder_service_min_heap_size: "512m"
+case_builder_service_max_heap_size: "1g"
+case_builder_service_min_cpus: "500m"
+case_builder_service_max_cpus: 2
+
+claim_service_min_container_memory: "512Mi"
+claim_service_max_container_memory: "1Gi"
+claim_service_min_heap_size: "256m"
+claim_service_max_heap_size: "1g"
+claim_service_min_cpus: "500m"
+claim_service_max_cpus: 1
+
+configuration_service_min_container_memory: "512Mi"
+configuration_service_max_container_memory: "1Gi"
+configuration_service_min_heap_size: "256m"
+configuration_service_max_heap_size: "1g"
+configuration_service_min_cpus: "500m"
+configuration_service_max_cpus: 1
+
+dashboard_ui_min_container_memory: "64Mi"
+dashboard_ui_max_container_memory: "128Mi"
+dashboard_ui_min_cpus: "100m"
+dashboard_ui_max_cpus: 1
+
+dictionary_service_min_container_memory: "512Mi"
+dictionary_service_max_container_memory: "1Gi"
+dictionary_service_min_heap_size: "256m"
+dictionary_service_max_heap_size: "1g"
+dictionary_service_min_cpus: "500m"
+dictionary_service_max_cpus: 1
+
+documentation_service_min_container_memory: "512Mi"
+documentation_service_max_container_memory: "1Gi"
+documentation_service_min_heap_size: "256m"
+documentation_service_max_heap_size: "1g"
+documentation_service_min_cpus: "500m"
+documentation_service_max_cpus: 1
+
+event_dispatcher_service_min_container_memory: "512Mi"
+event_dispatcher_service_max_container_memory: "1Gi"
+event_dispatcher_service_min_heap_size: "256m"
+event_dispatcher_service_max_heap_size: "1g"
+event_dispatcher_service_min_cpus: "500m"
+event_dispatcher_service_max_cpus: 1
+
+importer_service_min_container_memory: "512Mi"
+importer_service_max_container_memory: "1Gi"
+importer_service_min_heap_size: "256m"
+importer_service_max_heap_size: "1g"
+importer_service_min_cpus: "500m"
+importer_service_max_cpus: 1
+
+exporter_service_min_container_memory: "512Mi"
+exporter_service_max_container_memory: "1Gi"
+exporter_service_min_heap_size: "256m"
+exporter_service_max_heap_size: "1g"
+exporter_service_min_cpus: "500m"
+exporter_service_max_cpus: 1
+
+order_service_min_container_memory: "512Mi"
+order_service_max_container_memory: "1Gi"
+order_service_min_heap_size: "256m"
+order_service_max_heap_size: "1g"
+order_service_min_cpus: "500m"
+order_service_max_cpus: 1
+
+patient_service_min_container_memory: "512Mi"
+patient_service_max_container_memory: "1Gi"
+patient_service_min_heap_size: "256m"
+patient_service_max_heap_size: "1g"
+patient_service_min_cpus: "500m"
+patient_service_max_cpus: 1
+
+user_service_min_container_memory: "500Mi"
+user_service_max_container_memory: "1Gi"
+user_service_min_heap_size: "256m"
+user_service_max_heap_size: "1g"
+user_service_min_cpus: "500m"
+user_service_max_cpus: 2
+
+process_service_min_container_memory: "1Gi"
+process_service_max_container_memory: "2Gi"
+process_service_min_heap_size: "512m"
+process_service_max_heap_size: "1g"
+process_service_min_cpus: "500m"
+process_service_max_cpus: 2
+
+mu_sagemaker_service_min_container_memory: "512Mi"
+mu_sagemaker_service_max_container_memory: "1Gi"
+mu_sagemaker_service_min_heap_size: "512m"
+mu_sagemaker_service_max_heap_size: "1g"
+mu_sagemaker_service_min_cpus: "500m"
+mu_sagemaker_service_max_cpus: 1
+
+mirth_min_container_memory: "512Mi"
+mirth_max_container_memory: "2Gi"
+mirth_min_heap_size: "512m"
+mirth_max_heap_size: "1536m"
+mirth_min_cpus: "500m"
+mirth_max_cpus: 2
+
+# Default Tomcat DB pool sizing for all services
+tomcat_db_connection_pool:
+  db_initial_size: 5
+  db_max_wait: 30000
+  db_max_active: 20
+  db_max_idle: 5
+  db_min_idle: 5
+
+# DB pool sizing for Process Service
+process_service_db_initial_size: 5
+process_service_db_max_wait: 30000
+process_service_db_max_active: 15
+process_service_db_max_idle: 5
+process_service_db_min_idle: 5
+
+# Trying to bump down to the minimum number of worker nodes,
+# cluster autoscaler should scale us up as necessary
+worker_node_instance_type: c5.4xlarge
+worker_node_asg_min_size: 1
+worker_node_asg_max_size: 10
+
+######################
+# Application features
+######################
+
+# Process Service
+process_service_activity_evidence_enabled: true
+process_service_decision_evidence_enabled: true
+
+###########################
+# Ingress service resources
+###########################
+ingress_mirth_min_heap_size: "12g"
+ingress_mirth_max_heap_size: "14g"
+ingress_mirth_instance_type: c5.2xlarge
+
+# Application database parameters
+application_database_instance_class: db.t3.medium
+application_database_size: 2048
+application_database_version: "11.10"
+application_database_backup_retention_period: 30
+application_database_deletion_protection: false
+application_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+application_database_monitoring_interval: 30
+
+# No recovery of database secrets in development,
+# should be higher in other environments (particulary prod)
+application_database_secret_recovery_window_days: 0
+
+# Mirth database parameters
+mirth_database_instance_class: db.t3.small
+mirth_database_size: 256
+mirth_database_version: "11.10"
+mirth_database_backup_retention_period: 30
+mirth_database_deletion_protection: false
+mirth_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+mirth_database_monitoring_interval: 30
+
+# No recovery of database secrets in development,
+# should be higher in other environments (particulary prod)
+mirth_database_secret_recovery_window_days: 0
+
+ingress_mirth_database_instance_class: db.t3.small
+ingress_mirth_database_size: 256
+
+# Application data warehouse parameters
+application_data_warehouse_node_type: dc2.large
+application_data_warehouse_snapshot_retention_period: 30
+application_data_warehouse_cluster_version: 1.0
+application_data_warehouse_number_of_nodes: 1
+application_data_warehouse_logging_prefix: redshift/
+# !!! Note: snapshot copy currently disabled, see redshift.tf
+application_data_warehouse_snapshot_copy:
+  region: us-east-2
+  retention_period: 7
+application_data_warehouse_secret_recovery_window_days: 0
+application_data_warehouse_log_bucket_policy_aws_account: "193672423079"
+
+# Application elasticsearch parameters
+application_elasticsearch_instance_type: r5.large.elasticsearch
+application_elasticsearch_ebs_volume_size: 512
+application_elasticsearch_instance_count: 3
+
+# Bastion parameters
+bastion_instance_type: t3a.micro
+
+letsencrypt_environment_server: https://acme-staging-v02.api.letsencrypt.org/directory
+
+# Liquibase Contexts
+liquibase_dictionary_contexts: "schema,base,data,audit,PHS,CHS,penetration-test,veracode,demo,{{ env }}"
+liquibase_user_contexts: "schema,base,data,audit,PHS,CHS,penetration-test,veracode,demo,{{ env }}"
+liquibase_configuration_contexts: "schema,base,data,audit,PHS,CHS,penetration-test,veracode,{{ env }}"
+liquibase_casebuilder_contexts: "schema,base,data,audit,PHS,CHS,penetration-test,veracode,{{ env }}"
+liquibase_exporter_contexts: "schema,base,data,audit,PHS,CHS,{{ env }}"
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+firehose_lambda_function_dir: files/firehose_lambda_function
+cloud_watch_ingest_to_elasticsearch_log_groups:
+  cloudtrail_log_group:
+    name: Development-CloudTrailLogGroup-2PNFBOXCGDDB
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:Development-CloudTrailLogGroup-2PNFBOXCGDDB"
+    kinesis_shard_count: 1
+    index_name: "cloudtrail"
+    log_template_name: "es_cloudtrail"
+  application_postgresql_log_group :
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-application-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-application-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "application-postgresql"
+    log_template_name: "es_postgres"
+  ingress_postgresql_log_group :
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-ingress-mirth-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-ingress-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "ingress-mirth-postgresql"
+    log_template_name: "es_postgres"
+  mirth_postgresql_log_group :
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-mirth-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-mirth-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "mirth-postgresql"
+    log_template_name: "es_postgres"
+
+# Security Hub
+is_securityhub_account: true
+
+####################
+#  CloudWatch Alarms
+####################
+low_storage_space_cloudwatch_alarm:
+  elastic_search:
+    application_elasticsearch:
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in Megabytes,
+      # set to 128 Gigabytes (total volume size is 512 GB)
+      free_storage_space_threshold: 131072
+  rds:
+    application_db:
+      name: application
+      db_identifier: "codametrixapplication-{{ env }}-application-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes,
+      # set to 512 Gigabytes (total volume size is 2048 GB)
+      free_storage_space_threshold: 549755813888
+      unit: Bytes
+    codametrixapplication-ingress-mirth-db :
+      name: ingress-mirth
+      db_identifier: "codametrixapplication-{{ env }}-ingress-mirth-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes,
+      # set to 64 Gigabytes (total volume size is 256 GB)
+      free_storage_space_threshold: 68719476736
+      unit: Bytes
+    codametrixapplication-mirth-db :
+      name: mirth
+      db_identifier: "codametrixapplication-{{ env }}-mirth-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes,
+      # set to 64 Gigabytes (total volume size is 256 GB)
+      free_storage_space_threshold: 68719476736
+      unit: Bytes
+  redshift:
+    application_data_warehouse:
+      name: data-warehouse
+      db_identifier: "codametrixapplication-{{ env }}-data-warehouse-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # Percentage disk space used for data warehouse db
+      percentage_disk_space_used_threshold: 75
+
+# Vitalware
+vitalware_enabled: true
+
+# Mirth
+mirth_processing_indicator: T
+
+#Whitelisted IP Addresses
+cmx_api_public_whitelist:
+  - "34.195.146.191/32" # Veracode Platform IP
+  - "34.193.40.193/32" # Veracode MPT Source IP
+  - "52.205.76.209/32" # Veracode MPT Source IP
+  - "144.121.23.147/32" # Veracode MPT Source IP
+  - "72.22.163.32/27" # Veracode MPT Source IP
+
+# Security Groups
+cmx_automate_ingress_from_sg_sgs:
+  - description: Allow HTTPS from ACT stage CodePrediction workers
+    from_port: "443"
+    to_port: "443"
+    protocol: tcp
+    source_security_group_id: "{{ act_stage_codeprediction_worker_sg }}"
+  - description: Allow HTTP from ACT stage CodePrediction workers
+    from_port: "80"
+    to_port: "80"
+    protocol: tcp
+    source_security_group_id: "{{ act_stage_codeprediction_worker_sg }}"
+
+application_cmx_api_ingress_from_sg_sgs:
+  - description: Allow HTTPS from ACT stage CodePrediction workers
+    from_port: "443"
+    to_port: "443"
+    protocol: tcp
+    source_security_group_id: "{{ act_stage_codeprediction_worker_sg }}"
+  - description: Allow HTTP from ACT stage CodePrediction workers
+    from_port: "80"
+    to_port: "80"
+    protocol: tcp
+    source_security_group_id: "{{ act_stage_codeprediction_worker_sg }}"
+
+# Kubernetes autoscaling configuration
+kubernetes_hpa:
+  default:
+    min_pods: 1
+    max_pods: 10
+  case_builder_service:
+    min_pods: 1
+    max_pods: 10
+  claim_service:
+    min_pods: 1
+    max_pods: 10
+  configuration_service:
+    min_pods: 1
+    max_pods: 10
+  dictionary_service:
+    min_pods: 1
+    max_pods: 10
+  documentation_service:
+    min_pods: 1
+    max_pods: 10
+  exporter_service:
+    min_pods: 1
+    max_pods: 10
+  importer_service:
+    min_pods: 1
+    max_pods: 10
+  order_service:
+    min_pods: 1
+    max_pods: 10
+  patient_service:
+    min_pods: 1
+    max_pods: 10
+  process_service:
+    min_pods: 1
+    max_pods: 10
+  user_service:
+    min_pods: 1
+    max_pods: 10

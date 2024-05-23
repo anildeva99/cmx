@@ -1,0 +1,7 @@
+{% for engineer in engineers %}
+{% if (engineer.bastion_sudo|default(false)) %}
+# User rules for {{ engineer.name | lower }}
+{{ engineer.name | lower }} ALL=(ALL) NOPASSWD:ALL
+
+{% endif %}
+{% endfor %}

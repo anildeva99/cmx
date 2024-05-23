@@ -1,0 +1,151 @@
+---
+developers:
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: JeffreyTaylor
+    email: jeffrey@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: BrianMottershead
+    email: brian@codametrix.com
+  - name: JeffWoodward
+    email: woody@codametrix.com
+  - name: PhilCadigan
+    email: pcadigan@codametrix.com
+  - name: MattDemoy
+    email: matt@codametrix.com
+  - name: JeffToussaint
+    email: jtoussaint@codametrix.com
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: KeithGrohbrugge
+    email: keith@codametrix.com
+  - name: RobCosta
+    email: rob@codametrix.com
+  - name: KasiMusunuri
+    email: kasi@codametrix.com
+  - name: ToniAbrams
+    email: toni@codametrix.com
+  - name: SrinivasPandrangi
+    email: srinivas@codametrix.com
+  - name: DebbieWalker
+    email: debbie@codametrix.com
+  - name: CreightonLynch
+    email: creighton@codametrix.com
+  - name: RichardTrevorrow
+    email: rtrevorrow@codametrix.com
+  - name: SayyaraRajapova
+    email: sayyara@codametrix.com
+  - name: CarolinePierce
+    email: caroline@codametrix.com
+  - name: JoelRegen
+    email: joel@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+  - name: JoyeeWinifredLeoV
+    email: joyee@codametrix.com
+  - name: SureshKumar
+    email: suresh@codametrix.com
+  - name: EliOlson
+    email: eli@codametrix.com
+  - name: KellyKeene
+    email: kelly@codametrix.com
+
+# Ops Users
+ops_users:
+  # Mike Baglio
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/mike@codametrix.com-{{ env }}
+    username: mikebaglio-{{ env }}
+    group: system:masters
+  # Mahesh Narayanan
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/mahesh@codametrix.com-{{ env }}
+    username: maheshnarayanan-{{ env }}
+    group: system:masters
+  # Jeffrey Taylor
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/jeffrey@codametrix.com-{{ env }}
+    username: jeffreytaylor-{{ env }}
+    group: system:masters
+  # Phill Mell-Davies
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/PCD
+    username: phillmelldavies
+    group: system:masters
+  # Brian Mottershead
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/brian@codametrix.com-{{ env }}
+    username: brianmottershead-{{ env }}
+    group: system:masters
+  # Jeff Woodward
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/woody@codametrix.com-{{ env }}
+    username: jeffwoodward-{{ env }}
+    group: system:masters
+  # Phil Cadigan
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/pcadigan@codametrix.com-{{ env }}
+    username: philcadigan-{{ env }}
+    group: system:masters
+  # Matt Demoy
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/matt@codametrix.com-{{ env }}
+    username: mattdemoy-{{ env }}
+    group: system:masters
+  # Jeff Toussaint
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/jtoussaint@codametrix.com-{{ env }}
+    username: jefftoussaint-{{ env }}
+    group: system:masters
+  # Quincy Els
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/quincy@codametrix.com
+    username: quincyels
+    group: system:masters
+  # Keith Grohbrugge
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/keith@codametrix.com-{{ env }}
+    username: keithgrohbrugge-{{ env }}
+    group: system:masters
+  # Rob Costa
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/rob@codametrix.com-{{ env }}
+    username: robcosta-{{ env }}
+    group: system:masters
+  # Kasi Musunuri
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/kasi@codametrix.com-{{ env }}
+    username: kasimusunuri-{{ env }}
+    group: system:masters
+  # Toni Abrams
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/toni@codametrix.com-{{ env }}
+    username: toniabrams-{{ env }}
+    group: system:masters
+  # Srinivas Pandrangi
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/srinivas@codametrix.com-{{ env }}
+    username: srinivaspandrangi-{{ env }}
+    group: system:masters
+  # Jenkins Build User
+  - userarn: arn:aws:iam::{{ codametrix_tools_account_id }}:user/CodametrixTools-tools-BuildUser
+    username: build-user
+    group: system:masters
+  # Debbie Walker
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/debbie@codametrix.com-{{ env }}
+    username: debbiewalker-{{ env }}
+    group: system:masters
+  # Creighton Lynch
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/creighton@codametrix.com-{{ env }}
+    username: creightonlynch-{{ env }}
+    group: system:masters
+
+bastion_additional_users: []
+
+database_additional_users:
+  - DundasBI
+
+database_superusers: []
+
+data_warehouse_additional_users:
+  - DundasBI
+
+data_warehouse_additional_rw_users:
+  - WarehouseLoader
+
+data_warehouse_additional_superusers:
+  - MikeBaglioSuperuser
+  - BrianMottersheadSuperuser
+  - SrinivasPandrangi
+
+data_lake_additional_users:
+  - DundasBI

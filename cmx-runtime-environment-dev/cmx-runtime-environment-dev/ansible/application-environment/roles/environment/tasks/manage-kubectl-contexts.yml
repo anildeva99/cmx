@@ -1,0 +1,29 @@
+---
+- name: Check if application context already exists in kubeconfig
+  shell: >
+    kubectl config get-contexts|
+    grep "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+  failed_when: false
+  register: application_context
+
+- name: "Register the application kubectl context
+    in kubeconfig when state = 'present'"
+  command: >
+    aws eks --region "{{ region }}"
+    update-kubeconfig --name "{{ eks_cluster_name }}"
+  when: (state == "present") and
+        (application_context.stdout|length == 0)
+
+- name: Remove the context from kubeconfig when state = "absent"
+  command: >
+    kubectl config delete-context
+    "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+  when: (state == "absent") and
+        (application_context.stdout|length > 0)
+
+- name: Remove the kubectl cluster from kubeconfig when state = "absent"
+  command: >
+    kubectl config delete-cluster
+    "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+  when: (state == "absent") and
+        (application_context.stdout|length > 0)

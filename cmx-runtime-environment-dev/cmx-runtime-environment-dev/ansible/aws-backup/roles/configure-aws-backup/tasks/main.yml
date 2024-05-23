@@ -1,0 +1,51 @@
+---
+
+- name: Create list of RDS ARN(s) for env and append to target_resources_arns
+  vars:
+    query: 'instances[?tags.Environment==`{{ env }}`].db_instance_arn'
+  block:
+    - name: Gather info about RDS instances within env
+      community.aws.rds_instance_info:
+        region: "{{ region }}"
+      register: rds_info
+
+    - name: Set rds_env_list fact
+      set_fact:
+        rds_env_list: "{{ rds_info|json_query(query)|list }}"
+
+    - name: Append rds_env_list to target_resources_arns
+      set_fact:
+        target_resources_arns: "{{ target_resources_arns + rds_env_list }}"
+
+- name: Create dynamic terraform files from templates
+  template:
+    dest: "{{ terraform_path }}/{{ template }}"
+    mode: 0640
+    src: "{{ template }}.j2"
+  loop:
+    - "backend.tf"
+    - "terraform.tfvars"
+  loop_control:
+    loop_var: template
+
+- name: "Create ${HOME}/.codamatrix/{{ env }}/tmp"
+  file:
+    mode: 0700
+    path: "{{ lookup('env','HOME') }}/.codametrix/{{ env }}/tmp"
+    state: directory
+
+- name: Terraform block
+  block:
+    - name: Run AWS Backup terraform module(s)
+      environment:
+            TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      community.general.terraform:
+        force_init: "{{ terraform_force_init }}"
+        project_path: "{{ terraform_path }}"
+        state: "{{ state }}"
+        variables_file: terraform.tfvars
+      register: aws_backup_terraform
+  rescue:
+    - name: Terraform failed with the following error(s)
+      fail:
+        msg: "{{ aws_backup_terraform.msg.split('\n') }}"

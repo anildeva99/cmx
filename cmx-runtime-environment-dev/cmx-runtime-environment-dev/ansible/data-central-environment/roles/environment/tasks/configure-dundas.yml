@@ -1,0 +1,119 @@
+---
+- name: Gather facts about the Dundas application database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ dundas_application_database_identifier }}"
+    region: "{{ region }}"
+  register: dundas_application_database_facts
+
+- name: Gather facts about the Dundas warehouse database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ dundas_warehouse_database_identifier }}"
+    region: "{{ region }}"
+  register: dundas_warehouse_database_facts
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Get Dundas DB Admin Credentials
+  set_fact:
+    dundas_database_address: "{{ hostvars['localhost']['dundas_application_database_facts'].instances[0].endpoint.address }}"
+    dundas_warehouse_database_address: "{{ hostvars['localhost']['dundas_warehouse_database_facts'].instances[0].endpoint.address }}"
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Set Dundas's Application DB Secret if Empty
+  vars:
+    aws_secret_name: "CodaMetrixDataCentral/Dundas/ApplicationDatabase/{{ env }}-{{ dundas_application_database_username }}"
+    default_value: "{\"dbusername\":\"{{ dundas_application_database_username }}\",
+      \"dbpassword\":\"{{ lookup('randpass', '32', uppercase=10, lowercase=10, digits=10) }}\",
+      \"dburl\":\"jdbc:postgresql://{{ dundas_database_address }}/{{ dundas_application_database_name }}?ssl=true&sslmode=require\",
+      \"dbaddress\":\"{{ dundas_database_address }}\"}"
+  import_role:
+    name: environment-secret
+    tasks_from: default-value-if-empty.yml
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Set Dundas's Warehouse DB Secret if Empty
+  vars:
+    aws_secret_name: "CodaMetrixDataCentral/Dundas/WarehouseDatabase/{{ env }}-{{ dundas_warehouse_database_username }}"
+    default_value: "{\"dbusername\":\"{{ dundas_warehouse_database_username }}\",
+      \"dbpassword\":\"{{ lookup('randpass', '32', uppercase=10, lowercase=10, digits=10) }}\",
+      \"dburl\":\"jdbc:postgresql://{{ dundas_warehouse_database_address }}/{{ dundas_warehouse_database_name }}?ssl=true&sslmode=require\",
+      \"dbaddress\":\"dundas_warehouse_database_address\"}"
+  import_role:
+    name: environment-secret
+    tasks_from: default-value-if-empty.yml
+
+- name: Create SMTP User for Dundas in SES
+  community.aws.aws_ses_identity:
+    identity: "{{ dundas_ses_identity }}@codametrix.com"
+    region: "{{ region }}"
+    state: "{{ state }}"
+  register: dundas_smtp_user
+
+- name: "Pause Until Email is Verified
+    [LOG-IN TO {{ dundas_ses_identity }}@codametrix.com TO CONFIRM]"
+  pause:
+    seconds: 30
+  until: (dundas_smtp_user.verification_attributes.verification_status == "Success")
+
+- name: Generate Dundas's SES credentials if they don't exist
+  block:
+    - name: Set credentials fact
+      set_fact:
+        credentials: "{{ lookup('aws_secret',
+          dundas_ses_source_credentials_secret_name,
+          region=region) }}"
+  rescue:
+    - name: Create IAM credentials
+      community.aws.iam:
+        iam_type: user
+        name: "{{ dundas_ses_identity }}@codametrix.com"
+        region: "{{ region }}"
+        state: "{{ state }}"
+        access_key_state: create
+      register: credentials
+    - name: Set credentials fact
+      set_fact:
+        credentials: "{{ credentials.user_meta.access_keys[0] }}"
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Store Dundas's SES secret
+  vars:
+    aws_secret_name: "CodaMetrixDataCentral/Dundas/SES/{{ env }}-{{ dundas_ses_identity }}"
+    default_value: "{{ credentials }}"
+  import_role:
+    name: environment-secret
+    tasks_from: default-value-if-empty.yml
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Lookup AWS Secrets
+  set_fact:
+    DB_WAREHOUSE_SECRET: "{{ lookup('aws_secret',
+      'CodaMetrixDataCentral/Dundas/WarehouseDatabase/' + env + '-' + dundas_warehouse_database_username,
+      region=region) }}"
+    DB_SECRET: "{{ (lookup('aws_secret',
+      'CodaMetrixDataCentral/Dundas/ApplicationDatabase/' + env + '-' + dundas_application_database_username,
+      region=region)) }}"
+
+- name: Build Dundas config
+  vars:
+    additional_values:
+      ADMIN_PASS: "{{ lookup('randpass', '32', uppercase=10,
+        lowercase=10, digits=10) }}"
+      DB_PASS: "{{ DB_SECRET.dbpassword }}"
+      DB_WAREHOUSE_PASS: "{{ DB_WAREHOUSE_SECRET.dbpassword }}"
+      DB_ADDRESS: "{{ DB_SECRET.dbaddress }}"
+      DB_WAREHOUSE_ADDRESS: "{{ DB_WAREHOUSE_SECRET.dbaddress }}"
+      SMTP_PASS: "{{ credentials.secret_access_key }}"
+      APPLICATION_DB: "{{ dundas_application_database_name }}"
+      WAREHOUSE_DB: "{{ dundas_warehouse_database_name }}"
+  set_fact:
+    dundas_config: "{{ default_dundas_config|combine(additional_values) }}"
+
+- name: Set Dundas's configuration secret
+  vars:
+    aws_secret_name: "{{ dundas_config_secret_name }}"
+    default_value: "{{ dundas_config }}"
+  import_role:
+    name: environment-secret
+    tasks_from: default-value-if-empty.yml

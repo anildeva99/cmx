@@ -1,0 +1,175 @@
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: newrelic-infrastructure
+    chart: newrelic-infrastructure-0.13.27
+    release: nri-bundle
+    mode: unprivileged
+  name: nri-bundle-newrelic-infrastructure
+rules:
+  - apiGroups: [""]
+    resources:
+      - "nodes"
+      - "nodes/metrics"
+      - "nodes/stats"
+      - "nodes/proxy"
+      - "pods"
+      - "services"
+      - "secrets"
+    verbs: ["get", "list"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: newrelic-infrastructure
+    chart: newrelic-infrastructure-0.13.27
+    release: nri-bundle
+    mode: unprivileged
+  name: nri-bundle-newrelic-infrastructure
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nri-bundle-newrelic-infrastructure
+subjects:
+- kind: ServiceAccount
+  name: nri-bundle-newrelic-infrastructure
+  namespace: new-relic
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: newrelic-infrastructure
+    chart: newrelic-infrastructure-0.13.27
+    release: "nri-bundle"
+  name: nri-bundle-newrelic-infrastructure
+
+---
+# Custom Definition File to Set New Interval
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nri-kubernetes-definition-cfg
+  namespace: new-relic
+data:
+  nri-kubernetes-definition.yml: |
+    name: com.newrelic.kubernetes
+    description: "This NR Infrastructure definition uses a non-default 20s interval"
+    protocol_version: 2
+    os: linux
+    commands:
+      metrics:
+        command:
+          - ./bin/nri-kubernetes
+          - --metrics
+        interval: 20
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: newrelic-infrastructure
+    chart: newrelic-infrastructure-0.13.27
+    release: nri-bundle
+    mode: unprivileged
+  name: nri-bundle-newrelic-infrastructure
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: newrelic-infrastructure
+      release: nri-bundle
+  template:
+    metadata:
+      labels:
+        app: newrelic-infrastructure
+        release: nri-bundle
+        mode: unprivileged
+    spec:
+      serviceAccountName: nri-bundle-newrelic-infrastructure
+      containers:
+        - name: newrelic-infrastructure
+          image: "newrelic/infrastructure-k8s:1.17.0-unprivileged"
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            runAsUser: 1000 # nri-agent
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          env:
+            - name: NRIA_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: security-new-relic
+                  key: license_key
+            - name: "CLUSTER_NAME"
+              value: arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}
+            - name: ETCD_TLS_SECRET_NAMESPACE
+              value: "default"
+            - name: "NRIA_DISPLAY_NAME"
+              valueFrom:
+                fieldRef:
+                  apiVersion: "v1"
+                  fieldPath: "spec.nodeName"
+            - name: "NRK8S_NODE_NAME"
+              valueFrom:
+                fieldRef:
+                  apiVersion: "v1"
+                  fieldPath: "spec.nodeName"
+            - name: "NRIA_CUSTOM_ATTRIBUTES"
+              value: '{"clusterName":"$(CLUSTER_NAME)"}'
+            - name: "NRIA_PASSTHROUGH_ENVIRONMENT"
+              value: "KUBERNETES_SERVICE_HOST,KUBERNETES_SERVICE_PORT,CLUSTER_NAME,CADVISOR_PORT,NRK8S_NODE_NAME,KUBE_STATE_METRICS_URL,KUBE_STATE_METRICS_POD_LABEL,TIMEOUT,ETCD_TLS_SECRET_NAME,ETCD_TLS_SECRET_NAMESPACE,API_SERVER_SECURE_PORT,KUBE_STATE_METRICS_SCHEME,KUBE_STATE_METRICS_PORT,SCHEDULER_ENDPOINT_URL,ETCD_ENDPOINT_URL,CONTROLLER_MANAGER_ENDPOINT_URL,API_SERVER_ENDPOINT_URL,DISABLE_KUBE_STATE_METRICS"
+          volumeMounts:
+            - mountPath: /var/db/newrelic-infra/data
+              name: tmpfs-data
+            - mountPath: /var/db/newrelic-infra/user_data
+              name: tmpfs-user-data
+            - mountPath: /tmp
+              name: tmpfs-tmp
+            - mountPath: /var/cache/nr-kubernetes
+              name: tmpfs-cache
+            - mountPath: /var/db/newrelic-infra/newrelic-integrations/nri-kubernetes-definition.yml
+              name: nri-kubernetes-definition-cfg-volume
+              subPath: nri-kubernetes-definition.yml
+          resources:
+            limits:
+              cpu: 1
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 150Mi
+      volumes:
+        - name: tmpfs-data
+          emptyDir: {}
+        - name: tmpfs-user-data
+          emptyDir: {}
+        - name: tmpfs-tmp
+          emptyDir: {}
+        - name: tmpfs-cache
+          emptyDir: {}
+        - name: nri-kubernetes-definition-cfg-volume
+          configMap:
+            name: nri-kubernetes-definition-cfg
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+

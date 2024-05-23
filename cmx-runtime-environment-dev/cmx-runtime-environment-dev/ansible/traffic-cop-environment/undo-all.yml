@@ -1,0 +1,37 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Run all undo playbooks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+
+# Undo configuration of mirth
+- name: Import undo-configure-mirth.yml
+  import_playbook: undo-configure-mirth.yml
+
+# NOTE: undo-prepare-mirth-database.yml is failing currently
+#   due to dependencies between roles and schemas
+#- name: Import undo-prepare-mirth-databases.yml
+#  import_playbook: undo-prepare-mirth-databases.yml
+
+# Undo provisioning of environment, do cleanup
+- name: Import undo-provision-environment.yml
+  import_playbook: undo-provision-environment.yml
+- name: Import clean-terraform.yml
+  import_playbook: clean-terraform.yml

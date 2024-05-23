@@ -1,0 +1,127 @@
+# Customer Specific variables
+customerrouter_instance_type: t2.medium
+
+# Customer VPN AMIs (Cisco Cloud Services Router (CSR) 1000V - Security Pkg. Max Performance)
+customerrouter_amis:
+  us-east-1: ami-0c191b50cddbbae59
+
+######################################
+#  Traffic from other places to mirth
+######################################
+mirth_additional_open_ports: []
+
+##########
+# Partners
+##########
+# Note: From the Partners side, connection will NO LONGER be made to 10.255.30.32, instead WILL USE 10.255.30.35.
+partners_vpn_peer_ip_address: "170.223.168.146"
+partners_vpn_secret_recovery_window_days: 30
+
+# NAT Addresses
+# 10.254.18.224 = PDR Dev (172.27.124.78)
+# 10.254.18.225 = ICM Dev (172.27.54.243)
+# 10.254.15.238 = Ensemble QA (172.27.177.187)
+# 10.254.15.239 = Ensemble QA (172.27.177.186)
+# 10.254.19.114 = Ensemble QA (172.18.19.89)
+# 10.254.19.115 = Ensemble QA (172.18.19.91)
+partners_crypto_acl_entries:
+  - host 10.254.18.224
+  - host 10.254.18.225
+  - 10.254.15.232 0.0.0.7
+  - 10.254.19.112 0.0.0.15
+
+partners_route_cidr_blocks:
+  - index: 1
+    cidr: 10.254.18.224/32
+  - index: 2
+    cidr: 10.254.18.225/32
+  - index: 3
+    cidr: 10.254.15.232/29
+  - index: 4
+    cidr: 10.254.19.112/28
+
+# Partners reserved ports (reserved via L2L request with Partners network engineering):
+# PDR <-> CMX: 30000 - 30010
+# ICM <-> CMX: 30200 - 30231
+# Ensemble <-> CMX: 30400 - 30415
+partners_ingress_open_ports:
+  - 30000 # MGPO ADT (Prelude ADT [PDR] to CMX)
+  - 30001 # MGPO Results (Radiant ORU [PDR] to CMX)
+  - 30002 # MGPO CAC (CMX ORU to CAC [PDR])
+  - 30201 # MGPO Feedback (DFT [ICM] to CMX)
+  - 30202 # MGPO Billing (CMX DFT to Billing [ICM])
+
+# Mapping of Port -> NAT'd address
+partners_egress_port_mapping:
+  30000: 10.254.18.224 # MGPO ADT (Prelude ADT [PDR] to CMX)
+  30001: 10.254.18.224 # MGPO Results (Radiant ORU [PDR] to CMX)
+  30002: 10.254.18.224 # MGPO CAC (CMX ORU to CAC [PDR])
+  30201: 10.254.18.225 # MGPO Feedback (DFT [ICM] to CMX)
+  30202: 10.254.18.225 # MGPO Billing (CMX DFT to Billing [ICM])
+
+# Addresses of the Partners mirth network adapter
+# This is the address we give to the customer that traffic from the VPN is allowed to connect to.
+partners_networking_mirth_ip: "{{ ip_range_prefix }}.103.254"
+
+#############
+# CU Medicine
+#############
+cumedicine_vpn_peer_ip_address: "63.233.196.65"
+cumedicine_vpn_secret_recovery_window_days: 30
+cumedicine_crypto_acl_entries:
+  - host 192.168.90.9 # This is the IP we will use to send traffic to CU Medicine
+  - host 192.168.90.10 # This is the IP that CU Medicine traffic will originate from
+
+cumedicine_route_cidr_blocks:
+  - index: 1
+    cidr: 192.168.90.9/32
+  - index: 2
+    cidr: 192.168.90.10/32
+
+# CU Medicine reserved ports:
+# CU Medicine HSF (integration engine) <-> CMX: 31000 - 31031
+cumedicine_ingress_open_ports:
+  - 31001 # ADT (Admission/Discharge/Transfer)
+  - 31002 # ORU (Radiology Orders)
+  - 31003 # Feedback (DFT from CAC)
+  - 31004 # Send to CAC (ORU to CAC)
+  - 31005 # Send to Billing (DFT to Billing)
+
+# Mapping of Port -> NAT'd address
+cumedicine_egress_port_mapping:
+  31001: 192.168.90.9
+  31002: 192.168.90.9
+  31003: 192.168.90.9
+  31004: 192.168.90.9
+  31005: 192.168.90.9
+
+# Addresses of the CU Medicine mirth network adapter
+# This is the address we give to the customer that traffic from the VPN is allowed to connect to.
+cumedicine_networking_mirth_ip: "{{ ip_range_prefix }}.103.250"
+
+#######
+# Yale
+#######
+yale_vpn_peer_ip_address: "192.131.129.139"
+yale_vpn_secret_recovery_window_days: 30
+yale_crypto_acl_entries:
+  - host 10.47.3.24 # This is the IP we will use to send traffic to Yale ("CloverT")
+
+yale_route_cidr_blocks:
+  - index: 1
+    cidr: 10.47.3.24/32
+
+# Yale reserved ports:
+# Yale Clover (integration engine) <-> CMX: 31100 - 31199
+yale_ingress_open_ports:
+  - 31100 # (TBD)
+  - 31101 # (TBD)
+
+# Mapping of Port -> NAT'd (?) address
+yale_egress_port_mapping:
+  31100: 10.47.3.24
+  31101: 10.47.3.24
+
+# Addresses of the Yale mirth network adapter
+# This is the address we give to the customer that traffic from the VPN is allowed to connect to.
+yale_networking_mirth_ip: "{{ ip_range_prefix }}.103.246"

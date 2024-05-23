@@ -1,0 +1,68 @@
+---
+- name: Create Mirth configuration folder
+  become: true
+  file:
+    mode: 0700
+    owner: ubuntu
+    path: /etc/mirth
+    state: directory
+
+- name: Generate mirth.properties file
+  become: true
+  template:
+    dest: /etc/mirth/mirth.properties
+    mode: 0600
+    owner: ubuntu
+    src: mirth.properties.j2
+
+- name: Generate configurationMap.properties file
+  become: true
+  template:
+    dest: /etc/mirth/configurationMap.properties
+    mode: 0600
+    owner: ubuntu
+    src: configurationMap.properties.j2
+
+- name: Generate ErrorLookup.properties file
+  become: true
+  template:
+    dest: /etc/mirth/ErrorLookup.properties
+    mode: 0600
+    owner: ubuntu
+    src: ErrorLookup.properties
+
+- name: Generate HttpStatusLookup.properties file
+  become: true
+  template:
+    dest: /etc/mirth/HttpStatusLookup.properties
+    mode: 0600
+    owner: ubuntu
+    src: HttpStatusLookup.properties
+
+- name: Generate Mirth systemd configuration file
+  become: true
+  template:
+    dest: /etc/systemd/system/mirth.service
+    mode: 0600
+    owner: ubuntu
+    src: mirth.service.j2
+
+- name: Generate cmx-mirth-init.sh
+  become: true
+  template:
+    dest: /usr/local/bin/cmx-mirth-init.sh
+    mode: 0555
+    owner: ubuntu
+    src: cmx-mirth-init.sh.j2
+
+- name: Add the ubuntu user to the docker group
+  become: true
+  command: usermod -aG docker ubuntu
+
+- name: Alias the IP address of Ingress Mirth for each customer
+  become: true
+  command: "ip addr add {{ ip }}/24 dev ens5"
+  loop: "{{ secondary_private_ip_addresses }}"
+  loop_control:
+    loop_var: ip
+  failed_when: false

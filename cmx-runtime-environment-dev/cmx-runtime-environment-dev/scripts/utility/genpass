@@ -1,0 +1,9 @@
+#! /usr/bin/env bash
+numwords=$1
+maxlen=$2
+
+export LC_CTYPE=C
+rand=`head /dev/random | tr -dc '\!\@\#\$\%\^\&'`
+sep=${rand:0:1}
+pass=`xkcdpass --max $maxlen -n $numwords -d $sep -C capitalize`$[RANDOM%99+1]
+echo $pass

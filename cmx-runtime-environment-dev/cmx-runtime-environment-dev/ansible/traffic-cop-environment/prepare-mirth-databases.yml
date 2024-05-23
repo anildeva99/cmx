@@ -1,0 +1,76 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Generate local configurations for Mirth database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Apply preparatory configuration
+      import_role:
+        name: mirth-database
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion hosts
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Build local configuration
+      import_role:
+        name: mirth-database
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for bastion host ubuntu user
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure the database
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: present
+  tasks:
+    - name: Prep the Mirth database (users, schemas, etc) for use
+      vars:
+        database_address: "{{ hostvars['localhost']['mirth_database_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          mirth_database_admin_secret_name,
+          region=region) }}"
+      import_role:
+        name: mirth-database
+        tasks_from: configure-database.yml
+
+- name: Delete temporary files
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml

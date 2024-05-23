@@ -1,0 +1,14 @@
+---
+- name: Gather facts about the Application Mirth database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ mirth_database_identifier }}"
+    region: "{{ region }}"
+  register: application_mirth_database_facts
+
+- name: Gather facts about the Ingress Mirth database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ ingress_mirth_database_identifier }}"
+    region: "{{ region }}"
+  register: ingress_mirth_database_facts

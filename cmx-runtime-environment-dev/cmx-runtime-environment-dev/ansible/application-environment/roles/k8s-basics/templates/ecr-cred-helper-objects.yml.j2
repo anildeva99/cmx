@@ -1,0 +1,118 @@
+---
+# !!! Note: this cron job is based on a public image. Should create our own
+# !!! image for this. The image just needs kubectl / aws cli installed.
+# Based on: https://medium.com/@damitj07/how-to-configure-and-use-aws-ecr-with-kubernetes-rancher2-0-6144c626d42c
+# Based on: https://medium.com/@lestrrat/configuring-rbac-for-your-kubernetes-service-accounts-c348b64eb242
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secrets-writer
+  namespace: kube-system
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: patch-default-service-account
+  namespace: kube-system
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  resourceNames: ["default"]
+  verbs: ["get", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: default-serviceaccount-clusterrole-secrets-writer
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: default # we are just giving our default account more access OR  you can Reference to upper's `metadata.name`
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: secrets-writer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: default-serviceaccount-patch-default
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: default # we are just giving our default account more access OR  you can Reference to upper's `metadata.name`
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: patch-default-service-account
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  annotations:
+  name: ecr-cred-helper
+  namespace: kube-system
+spec:
+  concurrencyPolicy: Allow
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            name: ecr-cred-helper
+          annotations:
+            iam.amazonaws.com/role: {{ ecr_cred_helper_role }}
+
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -c
+            - |-
+              SECRET_NAME={{ region }}-ecr-registry
+              EMAIL=anymail.doesnt.matter@codametrix.com
+              TOKEN=`aws ecr get-login --no-include-email --region {{ region }} --registry-ids {{ codametrix_tools_account_id }} | cut -d' ' -f6`
+              echo "ENV variables setup done."
+              echo "Token: $TOKEN"
+              kubectl delete secret --ignore-not-found $SECRET_NAME
+              kubectl create secret docker-registry $SECRET_NAME \
+              --docker-server=https://{{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com \
+              --docker-username=AWS \
+              --docker-password="${TOKEN}"
+              echo "Secret created by name. $SECRET_NAME"
+              kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"'$SECRET_NAME'"}]}'
+              echo "All done."
+            env:
+            - name: AWS_DEFAULT_REGION
+              value: {{ region }}
+            image: expert360/kubectl-awscli:v1.11.2
+            imagePullPolicy: IfNotPresent
+            name: ecr-cred-helper
+            resources: {}
+            securityContext:
+              capabilities: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: Default
+          hostNetwork: true
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+  schedule: 0/15 * * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

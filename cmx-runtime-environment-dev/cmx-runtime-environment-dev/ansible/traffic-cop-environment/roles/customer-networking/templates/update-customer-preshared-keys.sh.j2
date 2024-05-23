@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Enter Partners Pre-shared Key
+echo "Rotating Pre-shared Key: CMXTrafficCop/CustomerVPN/{{ env }}-partners"
+echo "Enter the Partners pre-shared key (blank to skip): "
+read partnersKey
+export PARTNERS_PRE_SHARED_KEY=$partnersKey
+
+if [ "$PARTNERS_PRE_SHARED_KEY" != "" ]; then
+  # For now, just save the secret. ultimately should trigger update of the router
+  aws secretsmanager update-secret --region '{{ region }}' --secret-id "CMXTrafficCop/CustomerVPN/{{ env }}-partners" \
+      --description "Secret for VPN connection with Partners" \
+      --kms-key-id '{{ secrets_kms_key_alias }}' \
+      --secret-string "$PARTNERS_PRE_SHARED_KEY"
+fi
+
+# Enter CU Medicine Pre-shared Key
+echo "Rotating Pre-shared Key: CMXTrafficCop/CustomerVPN/{{ env }}-cumedicine"
+echo "Enter the CU Medicine pre-shared key (blank to skip): "
+read cumedicineKey
+export CUMEDICINE_PRE_SHARED_KEY=$cumedicineKey
+
+if [ "$CUMEDICINE_PRE_SHARED_KEY" != "" ]; then
+  # For now, just save the secret. ultimately should trigger update of the router
+  aws secretsmanager update-secret --region '{{ region }}' --secret-id "CMXTrafficCop/CustomerVPN/{{ env }}-cumedicine" \
+      --description "Secret for VPN connection with CU Medicine" \
+      --kms-key-id '{{ secrets_kms_key_alias }}' \
+      --secret-string "$CUMEDICINE_PRE_SHARED_KEY"
+fi
+
+# Enter YNHH (Yale) Pre-shared Key
+echo "Rotating Pre-shared Key: CMXTrafficCop/CustomerVPN/{{ env }}-yale"
+echo "Enter the Yale pre-shared key (blank to skip): "
+read yaleKey
+export YALE_PRE_SHARED_KEY=$yaleKey
+
+if [ "$YALE_PRE_SHARED_KEY" != "" ]; then
+  # For now, just save the secret. ultimately should trigger update of the router
+  aws secretsmanager update-secret --region '{{ region }}' --secret-id "CMXTrafficCop/CustomerVPN/{{ env }}-yale" \
+      --description "Secret for VPN connection with Yale" \
+      --kms-key-id '{{ secrets_kms_key_alias }}' \
+      --secret-string "$YALE_PRE_SHARED_KEY"
+fi

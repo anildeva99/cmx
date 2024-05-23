@@ -1,0 +1,16 @@
+---
+- name: Generate update-app-db-passwords-<env>.sh from template
+  template:
+    dest: "{{ temp_directory }}/update-app-db-passwords-{{ env }}.sh"
+    mode: 0750
+    src: update-app-db-password.sh.j2
+
+- name: Generate update-oauth-secrets-<env>.sh from template
+  vars:
+    oauth_services:
+      - 'processservice'
+      - 'monitorservice'
+  template:
+    dest: "{{ temp_directory }}/update-oauth-secrets-{{ env }}.sh"
+    mode: 0750
+    src: update-oauth-secrets.sh.j2

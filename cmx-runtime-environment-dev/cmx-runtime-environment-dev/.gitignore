@@ -1,0 +1,51 @@
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+# Terraform stuff
+.terraform
+.terraform-*
+terraform.tfvars
+errored.tfstate
+**/backend.tf
+**/terraform.tfvars
+**/.terraform
+**/.terraform-*
+terraform/*/dynamic_resources.tf
+terraform/*/customer_dynamic_resources.tf
+terraform/*/dundas_dynamic_resources.tf
+terraform/*/files/rotate-elasticsearch-index-lambda.zip
+terraform/*/files/elasticsearch_lambda_function_build
+
+.DS_Store
+
+__pycache__
+ami/dundas/files/dundas-installer.deb
+terraform/*/files/kinesis-firehose-cloudwatch-logs-processor.zip
+ami/dundas/files/Dundas.BI.Setup.exe
+ami/dundas-unix/files/dundas-installer.deb
+
+# Vim .swp
+*.swp
+
+# Vscode
+.vscode

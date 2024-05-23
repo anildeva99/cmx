@@ -1,0 +1,28 @@
+---
+- name: Retrieve database credentials secret
+  set_fact:
+    mirth_db_secret: "{{ lookup('aws_secret',
+      mirth_database_secret_name,
+      region=region) }}"
+
+- name: Gather facts about mirth
+  community.aws.ec2_instance_info:
+    filters:
+      "tag:Environment": "{{ env }}"
+      "tag:Type": mirth
+      "instance-state-name": running
+    region: "{{ region }}"
+  register: mirth_instance_facts
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Pull out a few key facts for use in configuring the Mirth instance
+  set_fact:
+    mirth_subnet_id: "{{ mirth_instance_facts.instances[0].network_interfaces[0].subnet_id }}"
+    mirth_eni_id: "{{ mirth_instance_facts.instances[0].network_interfaces[0].network_interface_id }}"
+
+- name: Assign secondary IP addresses to Mirth
+  amazon.aws.ec2_eni:
+    eni_id: "{{ mirth_eni_id }}"
+    region: "{{ region }}"
+    secondary_private_ip_addresses: "{{ secondary_private_ip_addresses }}"
+    subnet_id: "{{ mirth_subnet_id }}"

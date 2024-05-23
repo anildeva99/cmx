@@ -1,0 +1,57 @@
+---
+- name: Lookup public key in AWS secret manager
+  set_fact:
+    aws_secret_public_key_value : "{{ lookup('aws_secret',
+      '{{ aws_secret_private_key_var }}.pub',
+      errors='ignore',
+      region=region) }}"
+  register: aws_secret_public_key_returned_value
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Generate SSH keypair and store in secrets manager
+  block:
+    - name: Generate ssh keypair
+      community.crypto.openssh_keypair:
+        path: "{{ aws_secret_private_key_path_var }}"
+        size: 4096
+        state: "{{ state }}"
+        type: rsa
+      register: aws_secret_keypair
+
+    - name: Load private key content into variable for next step
+      slurp:
+        src: "{{ aws_secret_private_key_path_var }}"
+      register: slurped_aws_seceret_keypair_data
+
+    - name: Store private keys in secret manager if it is new
+      community.aws.aws_secret:
+        name: '{{ aws_secret_private_key_var }}'
+        region: "{{ region }}"
+        secret_type: 'string'
+        secret: "{{ slurped_aws_seceret_keypair_data.content|b64decode }}"
+        state: present
+
+    - name: Store public keys in secret manager if it is new
+      community.aws.aws_secret:
+        name: '{{ aws_secret_private_key_var }}.pub'
+        region: "{{ region }}"
+        secret_type: 'string'
+        secret: "{{ aws_secret_keypair.public_key }}"
+        state: present
+
+    - name: Delete private key file (it will be pull down when it is needed)
+      file:
+        path: "{{ aws_secret_private_key_path_var }}"
+        state: absent
+
+    - name: Delete  public key file
+      file:
+        path: "{{ aws_secret_private_key_path_var }}.pub"
+        state: absent
+
+    # TODO: [DEVOPS-388] Replace ansible pause with until loop
+    - name: Wait until secret is available after private/public keys are uploaded
+      pause:
+        seconds: 5
+  when: (aws_secret_public_key_returned_value is succeeded) and
+        (aws_secret_public_key_value == aws_secret_manager_secret_key_initial_value)

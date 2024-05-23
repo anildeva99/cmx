@@ -1,0 +1,29 @@
+---
+- name: Generate backend.tf (terraform) from template
+  template:
+    dest: "{{ terraform_path }}/backend.tf"
+    mode: 0640
+    src: terraform-backend.tf.j2
+
+- name: Generate terraform.tfvars from template
+  template:
+    dest: "{{ terraform_path }}/terraform.tfvars"
+    mode: 0640
+    src: terraform.tfvars.j2
+
+- name: Generate dynamic resource file
+  template:
+    dest: "{{ terraform_path }}/dynamic_resources.tf"
+    mode: 0640
+    src: dynamic-resources.tf.j2
+
+- name: Delete customer_dynamic_resources.tf
+  file:
+    path: "{{ terraform_path }}/customer_dynamic_resources.tf"
+    state: absent
+
+- name: Generate customer dynamic resource file
+  template:
+    dest: "{{ terraform_path }}/customer_dynamic_resources.tf"
+    mode: 0640
+    src: customer-dynamic-resources.tf.j2

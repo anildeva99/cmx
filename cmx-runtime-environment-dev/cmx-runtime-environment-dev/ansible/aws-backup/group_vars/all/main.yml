@@ -1,0 +1,8 @@
+---
+# current supported ansible version
+current_ansible_version: "2.10.4"
+
+# global supported regions
+regions:
+  - "us-east-1"
+  - "us-west-2"

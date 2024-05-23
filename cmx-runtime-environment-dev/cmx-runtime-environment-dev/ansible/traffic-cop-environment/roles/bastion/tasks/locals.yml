@@ -1,0 +1,168 @@
+---
+  # ###########
+  # Engineers
+  # ###########
+  # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+  # Multiple instances within this file
+- name: Lookup public key in AWS secret manager for each engineer
+  set_fact:
+    bastion_keypair_public_key : "{{ lookup('aws_secret',
+      'CMXTrafficCop/Engineers/bastion-host-{{ env }}-{{ eng.name|lower }}-id_ssh_rsa.pub',
+      errors='ignore',
+      region=region) }}"
+  loop: "{{ engineers }}"
+  loop_control:
+    loop_var: eng
+  register: bastion_host_engineer_public_key_returned_value
+
+- name: Generate engineer keypairs for the bastion host
+  community.crypto.openssh_keypair:
+    path: "{{ temp_directory }}/bastion-host-{{ env }}-{{ eng_key[0].name|lower }}-id_ssh_rsa"
+    size: 4096
+    state: "{{ state }}"
+    type: rsa
+  loop: "{{ engineers|product(bastion_host_engineer_public_key_returned_value.results)|list }}"
+  loop_control:
+    loop_var: eng_key
+  register: bastion_host_engineer_id_ssh_rsa
+  when: (eng_key[1] is succeeded) and
+        (eng_key[1].eng.name == eng_key[0].name) and
+        (eng_key[1].ansible_facts.bastion_keypair_public_key
+          == aws_secret_manager_secret_key_initial_value)
+
+- name: Load private key data into variable
+  slurp:
+    src: "{{ temp_directory }}/bastion-host-{{ env }}-{{ eng_key[0].name|lower }}-id_ssh_rsa"
+  loop: "{{ engineers|product(bastion_host_engineer_public_key_returned_value.results)|list }}"
+  loop_control:
+    loop_var: eng_key
+  register: slurped_bastion_host_engineer_keypair_data
+  when: (eng_key[1] is succeeded) and
+        (eng_key[1].eng.name == eng_key[0].name) and
+        (eng_key[1].ansible_facts.bastion_keypair_public_key
+          == aws_secret_manager_secret_key_initial_value)
+
+- name: Store bastion private keys in secret manager
+  community.aws.aws_secret:
+    name: "CMXTrafficCop/Engineers/{{ eng_priv_key[1].source.split('/')[7]|lower }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ eng_priv_key[1].content|b64decode }}"
+    state: present
+  loop: "{{ engineers|product(slurped_bastion_host_engineer_keypair_data.results)|list }}"
+  loop_control:
+    loop_var: eng_priv_key
+  when: ('source' in eng_priv_key[1]) and
+        (eng_priv_key[1].eng_key[0].name == eng_priv_key[0].name)
+
+- name: Store bastion public keys for each engineer in secret manager
+  community.aws.aws_secret:
+    name: "CMXTrafficCop/Engineers/{{ eng_pub_key[1].filename.split('/')[7] |lower }}.pub"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ eng_pub_key[1].public_key }}"
+    state: present
+  loop: "{{ engineers|product(bastion_host_engineer_id_ssh_rsa.results)|list }}"
+  loop_control:
+    loop_var: eng_pub_key
+  when: ('public_key' in eng_pub_key[1]) and
+        (eng_pub_key[1].eng_key[0].name == eng_pub_key[0].name)
+
+- name: Delete bastion secret key file for each engineer
+  file:
+    state: absent
+    path: "{{ temp_directory }}/bastion-host-{{ env }}-{{ eng.name|lower }}-id_ssh_rsa"
+  loop: "{{ engineers }}"
+  loop_control:
+    loop_var: eng
+
+- name: Delete bastion public key file for each engineer
+  file:
+    state: absent
+    path: "{{ temp_directory }}/bastion-host-{{ env }}-{{ eng.name|lower }}-id_ssh_rsa.pub"
+  loop: "{{ engineers }}"
+  loop_control:
+    loop_var: eng
+
+  # ########################
+  # Bastion Additional Users
+  # ########################
+- name: Lookup public key in AWS secret manager for each bastion additional user
+  set_fact:
+    bastion_keypair_public_key: "{{ lookup('aws_secret',
+      'CMXTrafficCop/BastionAdditionalUsers/bastion-host-{{ env }}-{{ addit_user.name|lower }}-id_ssh_rsa.pub',
+      errors='ignore',
+      region=region) }}"
+  loop: "{{ bastion_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+  register: bastion_host_addl_user_public_key_returned_value
+
+- name: Generate bastion additional user keypairs for the bastion host
+  community.crypto.openssh_keypair:
+    path: "{{ temp_directory }}/bastion-host-{{ env }}-{{ addit_user_key[0].name|lower }}-id_ssh_rsa"
+    size: 4096
+    state: "{{ state }}"
+    type: rsa
+  loop: "{{ bastion_additional_users|product(bastion_host_addl_user_public_key_returned_value.results)|list }}"
+  loop_control:
+    loop_var: addit_user_key
+  register: bastion_host_addl_user_id_ssh_rsa
+  when: (addit_user_key[1] is succeeded) and
+        (addit_user_key[1].addit_user.name == addit_user_key[0].name) and
+        (addit_user_key[1].ansible_facts.bastion_keypair_public_key
+          == aws_secret_manager_secret_key_initial_value)
+
+- name: Load private key data into variable
+  slurp:
+    src: "{{ temp_directory }}/bastion-host-{{ env }}-{{ addit_user_key[0].name|lower }}-id_ssh_rsa"
+  loop: "{{ bastion_additional_users|product(bastion_host_addl_user_public_key_returned_value.results)|list }}"
+  loop_control:
+    loop_var: addit_user_key
+  register: slurped_bastion_host_addl_user_keypair_data
+  when: (addit_user_key[1] is succeeded) and
+        (addit_user_key[1].addit_user.name == addit_user_key[0].name) and
+        (addit_user_key[1].ansible_facts.bastion_keypair_public_key
+          == aws_secret_manager_secret_key_initial_value)
+
+- name: Store bastion private keys in secret manager
+  community.aws.aws_secret:
+    name: "CMXTrafficCop/BastionAdditionalUsers/{{ addit_user_priv_key[1].source.split('/')[7]|lower }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ addit_user_priv_key[1].content|b64decode }}"
+    state: present
+  loop: "{{ bastion_additional_users|product(slurped_bastion_host_addl_user_keypair_data.results)|list }}"
+  loop_control:
+    loop_var: addit_user_priv_key
+  when: ('source' in addit_user_priv_key[1]) and
+        (addit_user_priv_key[1].addit_user_key[0].name == addit_user_priv_key[0].name)
+
+- name: Store bastion public keys for each bastion additional user in secret manager
+  community.aws.aws_secret:
+    name: "CMXTrafficCop/BastionAdditionalUsers/{{ addit_user_pub_key[1].filename.split('/')[7]|lower }}.pub"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ addit_user_pub_key[1].public_key }}"
+    state: present
+  loop: "{{ bastion_additional_users|product(bastion_host_addl_user_id_ssh_rsa.results)|list }}"
+  loop_control:
+    loop_var: addit_user_pub_key
+  when: ('public_key' in addit_user_pub_key[1]) and
+        (addit_user_pub_key[1].addit_user_key[0].name == addit_user_pub_key[0].name)
+
+- name: Delete bastion private key file for each additional user
+  file:
+    path: "{{ temp_directory }}/bastion-host-{{ env }}-{{ addit_user.name|lower }}-id_ssh_rsa"
+    state: absent
+  loop: "{{ bastion_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+
+- name: Delete bastion public key file for each additional user
+  file:
+    path: "{{ temp_directory }}/bastion-host-{{ env }}-{{ addit_user.name|lower }}-id_ssh_rsa.pub"
+    state: absent
+  loop: "{{ bastion_additional_users }}"
+  loop_control:
+    loop_var: addit_user

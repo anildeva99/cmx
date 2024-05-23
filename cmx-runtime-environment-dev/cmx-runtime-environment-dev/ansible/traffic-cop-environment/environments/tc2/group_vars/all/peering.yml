@@ -1,0 +1,9 @@
+---
+  # Peering connections for the tc2 environment
+peer_vpc_routes:
+  - pcx_name: CMXTC2-CMXDevelopmentIngress # TC2 <-> Development Ingress
+    destination_cidr: 10.52.0.0/16
+  - pcx_name: CMXTC2-CMXStage1Ingress # TC2 <-> Stage 1 Ingress
+    destination_cidr: 10.58.0.0/16
+  - pcx_name: ToolsNet-CMXTC2 # Tools Network <-> TC2
+    destination_cidr: "{{ codametrix_tools_cidr }}"

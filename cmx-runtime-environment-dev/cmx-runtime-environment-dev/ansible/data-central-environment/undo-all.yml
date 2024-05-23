@@ -1,0 +1,18 @@
+---
+- name: Run undo of all
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+
+# undo-prepare-database.yml is failing currently due
+# to dependencies between roles and schemas
+- name: Import undo-prepare-database.yml
+  import_playbook: undo-prepare-database.yml
+
+# Undo provisioning of environment, do cleanup
+- name: Import undo-provision-environment.yml
+  import_playbook: undo-provision-environment.yml
+- name: Import clean-terraform.yml
+  import_playbook: clean-terraform.yml

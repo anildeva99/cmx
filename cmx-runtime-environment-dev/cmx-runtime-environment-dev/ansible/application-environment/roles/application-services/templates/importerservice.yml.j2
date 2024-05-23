@@ -1,0 +1,206 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: importer-service
+  labels:
+    app: importer-service
+spec:
+  selector:
+    app: importer-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_importer_service }}
+    targetPort: {{ container_ports.cmx_importer_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: importer-service
+  labels:
+    app: importer-service
+    version: {{ image_versions.cmx_importer_service }}
+spec:
+  replicas: {{ (kubernetes_hpa.importer_service.min_pods is defined) | ternary( kubernetes_hpa.importer_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: importer-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: importer-service
+        version: {{ image_versions.cmx_importer_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.importerservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-importer-service:{{ image_versions.cmx_importer_service }}
+        imagePullPolicy: {{ cmx_importer_service_image_pull_policy }}
+        name: importer-service
+        resources:
+          limits:
+            memory: {{ importer_service_max_container_memory }}
+            cpu: {{ importer_service_max_cpus }}
+          requests:
+            memory: {{ importer_service_min_container_memory }}
+            cpu: {{ importer_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/importer-service/importer-service-{{ image_versions.cmx_importer_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ importer_service_min_heap_size }}", "-Xmx{{ importer_service_max_heap_size }}", "/opt/tools/importer-service/importer-service-{{ image_versions.cmx_importer_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_importer_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_importer_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_importer_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_importer_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: IMPORTER_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: importerservice-database
+                key: dburl
+          - name: IMPORTER_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: importerservice-database
+                key: dbusername
+          - name: IMPORTER_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: importerservice-database
+                key: dbpassword
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: importer-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: importer-service
+  minReplicas: {{ (kubernetes_hpa.importer_service.min_pods is defined) | ternary( kubernetes_hpa.importer_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.importer_service.max_pods is defined) | ternary( kubernetes_hpa.importer_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

@@ -1,0 +1,96 @@
+# This is used to generate minimal demo mode. It is included from demo and demo-auth values.
+# It is shipped with the release, used for bookinfo or quick installation of istio.
+# Includes components used in the demo, defaults to alpha3 rules.
+# Note: please only put common configuration for the demo profiles here.
+global:
+  proxy:
+    excludeIPRanges: "169.254.169.254/32"
+    accessLogFile: "{{ istio_access_log_file }}"
+    resources:
+      requests:
+        cpu: 10m
+        memory: 40Mi
+
+  disablePolicyChecks: false
+
+  controlPlaneSecurityEnabled: true
+
+  mtls:
+    # Default setting for service-to-service mtls. Can be set explicitly using
+    # destination rules or service annotations.
+    #enabled: true
+    enabled: false
+
+  k8sIngress:
+    enabled: false
+    enableHttps: false
+
+sidecarInjectorWebhook:
+  enabled: true
+  # If true, webhook or istioctl injector will rewrite PodSpec for liveness
+  # health check to redirect request to sidecar. This makes liveness check work
+  # even when mTLS is enabled.
+  rewriteAppHTTPProbe: true
+
+pilot:
+  autoscaleEnabled: false
+  traceSampling: 100.0
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+
+mixer:
+  policy:
+    enabled: true
+    autoscaleEnabled: false
+    resources:
+      requests:
+        cpu: 10m
+        memory: 100Mi
+
+  telemetry:
+    enabled: true
+    autoscaleEnabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 100Mi
+
+  adapters:
+    stdio:
+      # Set this to true to enable mixer telemetry logs (logging every request between istio-enabled services)
+      enabled: false
+
+grafana:
+  enabled: true
+  persist: false
+
+tracing:
+  enabled: true
+
+kiali:
+  enabled: true
+  createDemoSecret: true
+
+gateways:
+  istio-ingressgateway:
+    enabled: true
+    autoscaleEnabled: false
+    resources:
+      requests:
+        cpu: 10m
+        memory: 40Mi
+    sds:
+      enabled: true
+    env:
+      # AWS ELB timeout = 60s (hard), NLB = 350s (hard), ALB = 60s (default)
+      ISTIO_META_IDLE_TIMEOUT: 60s
+
+  istio-egressgateway:
+    enabled: true
+    autoscaleEnabled: false
+    resources:
+      requests:
+        cpu: 10m
+        memory: 40Mi

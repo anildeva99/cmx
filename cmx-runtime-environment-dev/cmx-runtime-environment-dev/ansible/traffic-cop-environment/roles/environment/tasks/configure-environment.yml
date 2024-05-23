@@ -1,0 +1,52 @@
+---
+- name: "Set environment state to {{ state }}"
+  community.general.terraform:
+    force_init: "{{ force_init }}"
+    project_path: "{{ terraform_path }}"
+    state: "{{ state }}"
+    variables_file: terraform.tfvars
+  register: environment_terraform
+
+# NOTE: Now we rotate the DB master passwords as they are set by terraform
+#   so whatever password is used there will be stored in terraform state.
+
+- name: Gather facts about the Mirth database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ mirth_database_identifier }}"
+    region: "{{ region }}"
+  register: mirth_database_facts
+
+- name: Pause for 3 minutes to allow DB modify operations to finish
+  pause:
+    minutes: 3
+  when: (environment_terraform.changed)
+
+- name: Generate passwords to use for rotation.
+  set_fact:
+    mirthdb_master_password: "{{ lookup('randpass', '32', uppercase=10,
+      lowercase=10, digits=10) }}"
+
+- name: Rotate Mirth DB password to one not in TF state
+  command: >
+    aws rds modify-db-instance --region "{{ region }}"
+    --db-instance-identifier "{{ mirth_database_identifier }}"
+    --master-user-password "{{ mirthdb_master_password }}"
+  when: (state == "present")
+
+- name: Update secret for the Mirth DB credentials
+  vars:
+    address: "{{ mirth_database_facts.instances[0].endpoint.address }}"
+    db_name: "{{ mirth_database_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ mirth_database_admin_username }}",
+      "dbpassword":"{{ mirthdb_master_password }}",
+      "dburl":"jdbc:postgresql://{{ url }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ secrets_kms_key_alias }}"
+    name: "{{ mirth_database_admin_secret_name }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"

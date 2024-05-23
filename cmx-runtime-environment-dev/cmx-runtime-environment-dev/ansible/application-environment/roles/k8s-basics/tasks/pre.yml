@@ -1,0 +1,9 @@
+---
+- name: "Gather info about the VPC that in which
+    the ingress controller will be deployed"
+  amazon.aws.ec2_vpc_net_info:
+    filters:
+      "tag:Environment": "{{ env }}"
+      "tag:Type": "{{ vpc_type_tag }}"
+    region: "{{ region }}"
+  register: vpc_facts

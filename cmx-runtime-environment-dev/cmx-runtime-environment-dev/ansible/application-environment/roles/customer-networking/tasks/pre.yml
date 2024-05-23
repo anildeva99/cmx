@@ -1,0 +1,35 @@
+---
+- name: Add customer networking CSR 1 host to the in-memory inventory
+  add_host:
+    ansible_authorize: true
+    ansible_become_method: enable
+    ansible_become: true
+    ansible_connection: network_cli
+    ansible_host: "csr-1-private.{{ env }}.application.codametrix.com"
+    ansible_network_os: ios
+    ansible_port: 22
+    ansible_python_interpreter: /usr/bin/python2
+    ansible_ssh_private_key_file: "{{ customer_networking_private_key_path }}"
+    ansible_user: "{{ customer_networking_csr_1_login_username }}"
+    group: ingress_customer_networking
+    name: "csr-1-private.{{ env }}.application.codametrix.com"
+
+- name: Gather info about the CSR 1 private ENI
+  amazon.aws.ec2_eni_info:
+    filters:
+      "tag:Environment": "{{ env }}"
+      "tag:Type": customer_networking_csr_1_private_interface
+    region: "{{ region }}"
+  register: cmx_csr_1_private_eni_facts
+
+- name: Retrieve Pre-shared Key from Partners VPN secret
+  set_fact:
+    partners_vpn_tunnel_preshared_key: "{{ lookup('aws_secret',
+      'CodaMetrixApplication/CustomerVPN/' + env + '-partners',
+      region=region) }}"
+
+- name: Retrieve Pre-shared Key from CU Medicine VPN secret
+  set_fact:
+    cumedicine_vpn_tunnel_preshared_key: "{{ lookup('aws_secret',
+      'CodaMetrixApplication/CustomerVPN/' + env + '-cumedicine',
+      region=region) }}"

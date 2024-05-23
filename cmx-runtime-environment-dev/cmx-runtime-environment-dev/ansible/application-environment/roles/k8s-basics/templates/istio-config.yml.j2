@@ -1,0 +1,51 @@
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: default
+  namespace: codametrix
+spec:
+  host: "*.local"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 2048
+        tcpKeepalive:
+          interval: 10s
+          time: 15s
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "default"
+  namespace: "codametrix"
+spec:
+  peers:
+  - mtls: {}
+
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  host: "*.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: DestinationRule
+metadata:
+  name: api-server
+  namespace: istio-system
+spec:
+  host: "kubernetes.default.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: DISABLE

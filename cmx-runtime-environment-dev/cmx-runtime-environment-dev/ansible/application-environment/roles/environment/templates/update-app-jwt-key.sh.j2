@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Update the jwt key
+echo "Enter new JWT key (64-characters, letters and numbers, base64 encoded. Blank to skip): "
+read jwtkey
+
+if [ "$jwtkey" != "" ]; then
+  # Update AWS secret
+  aws secretsmanager update-secret --region "{{ region }}" \
+    --secret-id "CodaMetrixApplication/Security/{{ env }}" \
+    --kms-key-id '{{ application_secrets_kms_key_alias }}' \
+    --secret-string '{"jwt_key":"'${jwtkey}'"}'
+fi

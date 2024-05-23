@@ -1,0 +1,27 @@
+---
+# Helper Playbook to Set a Default Secret Value if the Secret is Empty
+# Takes in 2 Paramaters:
+#     aws_secret_name   The name of the secret in AWS SecretsManager
+#     default_value   The value to default to if the secret is Empty
+- name: "Lookup Value for {{ aws_secret_name }}"
+  block:
+    - name: Set secret_lookup fact
+      set_fact:
+        secret_lookup: "{{ lookup('aws_secret',
+           aws_secret_name,
+           region=region) }}"
+    - debug:
+        msg: "Found Existing Value for {{ aws_secret_name }}"
+        verbosity: 1
+  rescue:
+    - debug:
+        msg: "Setting Default Value {{ default_value }}
+          for {{ aws_secret_name }}"
+        verbosity: 1
+    - name: "Create secret {{ aws_secret_name }}"
+      community.aws.aws_secret:
+        name: "{{ aws_secret_name }}"
+        region: "{{ region }}"
+        secret_type: 'string'
+        secret: "{{ default_value }}"
+        state: "{{ state }}"

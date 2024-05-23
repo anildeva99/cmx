@@ -1,0 +1,40 @@
+---
+- name: Load common environment-specific variables
+  include_vars:
+    file: "{{ env }}.yml"
+
+- name: Generate backend.tf (terraform) from template
+  template:
+    dest: "{{ terraform_path }}/backend.tf"
+    mode: 0640
+    src: terraform-backend.tf.j2
+
+- name: Generate terraform.tfvars from template
+  environment:
+    TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+  template:
+    dest: "{{ terraform_path }}/terraform.tfvars"
+    mode: 0640
+    src: terraform.tfvars.j2
+
+- name: Generate dynamic_resources.tf from template
+  template:
+    dest: "{{ terraform_path }}/dynamic_resources.tf"
+    mode: 0640
+    src: dynamic-resources.tf.j2
+
+- name: Terraform block
+  block:
+    - name: "Configuring AWS cross-account policies state to {{ state }}"
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      community.general.terraform:
+        force_init: "{{ force_init }}"
+        project_path: "{{ terraform_path }}"
+        state: "{{ state }}"
+        variables_file: terraform.tfvars
+      register: terraform_run
+  rescue:
+    - name: Terraform failed with the following error(s)
+      fail:
+        msg: "{{ terraform_run.msg.split('\n') }}"

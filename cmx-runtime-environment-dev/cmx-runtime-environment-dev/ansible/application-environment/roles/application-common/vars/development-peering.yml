@@ -1,0 +1,19 @@
+# Peering connections for the development environment
+
+application_peer_vpc_routes:
+  - pcx_name: CMXDevelopmentApp-CMXDevelopmentIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.52.0.0/16
+  - pcx_name: DataCentral2-CMXDevelopmentApplication # Data Central 2 <-> Development
+    destination_cidr: 10.72.0.0/16
+  - pcx_name: ToolsNet-CMXDevelopment # Tools Network <-> Development
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: ACTStage-CMXDevelopmentApplication
+    destination_cidr: 10.1.0.0/16
+
+ingress_peer_vpc_routes:
+  - pcx_name: CMXDevelopmentApp-CMXDevelopmentIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.51.0.0/16
+  - pcx_name: ToolsNet-CMXDevelopmentIngress # Tools Network <-> Development Ingress
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: CMXDevelopmentIngress-CMXStage1Ingress # Development Ingress <-> Stage 1 Ingress
+    destination_cidr: 10.58.0.0/16

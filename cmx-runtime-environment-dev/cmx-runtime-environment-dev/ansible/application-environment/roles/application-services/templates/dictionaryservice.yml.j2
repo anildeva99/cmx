@@ -1,0 +1,220 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: dictionary-service
+  labels:
+    app: dictionary-service
+spec:
+  selector:
+    app: dictionary-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_dictionary_service }}
+    targetPort: {{ container_ports.cmx_dictionary_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dictionary-service
+  labels:
+    app: dictionary-service
+    version: {{ image_versions.cmx_dictionary_service }}
+spec:
+  replicas: {{ (kubernetes_hpa.dictionary_service.min_pods is defined) | ternary( kubernetes_hpa.dictionary_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: dictionary-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: dictionary-service
+        version: {{ image_versions.cmx_dictionary_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.dictionaryservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-dictionary-service:{{ image_versions.cmx_dictionary_service }}
+        imagePullPolicy: {{ cmx_dictionary_service_image_pull_policy }}
+        name: dictionary-service
+        resources:
+          limits:
+            memory: {{ dictionary_service_max_container_memory }}
+            cpu: {{ dictionary_service_max_cpus }}
+          requests:
+            memory: {{ dictionary_service_min_container_memory }}
+            cpu: {{ dictionary_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/dictionary-service/dictionary-service-{{ image_versions.cmx_dictionary_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ dictionary_service_min_heap_size }}", "-Xmx{{ dictionary_service_max_heap_size }}", "/opt/tools/dictionary-service/dictionary-service-{{ image_versions.cmx_dictionary_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_dictionary_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_dictionary_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_dictionary_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_dictionary_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: DICTIONARY_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: dictionaryservice-database
+                key: dburl
+          - name: DICTIONARY_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: dictionaryservice-database
+                key: dbusername
+          - name: DICTIONARY_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: dictionaryservice-database
+                key: dbpassword
+          - name: LIQUIBASE_DICTIONARY_CONTEXTS
+            value: "{{ liquibase_dictionary_contexts }}"
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+          # DB Connection pool properties
+          - name: DICTIONARY_SERVICE_DB_INITIAL_SIZE
+            value: "{{ dictionary_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: DICTIONARY_SERVICE_DB_MAX_WAIT
+            value: "{{ dictionary_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: DICTIONARY_SERVICE_DB_MAX_ACTIVE
+            value: "{{ dictionary_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: DICTIONARY_SERVICE_DB_MAX_IDLE
+            value: "{{ dictionary_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: DICTIONARY_SERVICE_DB_MIN_IDLE
+            value: "{{ dictionary_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dictionary-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dictionary-service
+  minReplicas: {{ (kubernetes_hpa.dictionary_service.min_pods is defined) | ternary( kubernetes_hpa.dictionary_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.dictionary_service.max_pods is defined) | ternary( kubernetes_hpa.dictionary_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

@@ -1,0 +1,37 @@
+---
+# Default region to copy backups to
+aws_dst_region: "us-west-2"
+
+# Default Region in which resources reside and in which primary backup
+# is stored and executed
+aws_src_region: "{{ region }}"
+
+# Default enable KMS key rotation
+enable_key_rotation: true
+
+# Default environment to target
+env: ""
+
+# Default management bucket to stote tfstate within
+management_bucket: ""
+
+# Default tag(s) to apply to created resources
+shared_resource_tags:
+  BillingCategory: "DR"
+  BillingTeam: "Engineering"
+  BillingEnvironment: "{{ env|title }}"
+  BillingApplication: "CMx"
+  Environment: "{{ env }}"
+  Usage: "CodaMetrix DR"
+
+# Default state of resources
+state: "present"
+
+# Deafult resources that will be attached to the created backup plan
+target_resources_arns: []
+
+# Default to force a terraform init
+terraform_force_init: true
+
+# Default path to terraform root module
+terraform_path: "../../terraform/aws-backup"

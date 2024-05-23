@@ -1,0 +1,32 @@
+---
+- name: Clean up old Metrics Server downloads
+  file:
+    path: "{{ temp_directory }}/metrics-server"
+    state: absent
+
+- name: Clone metrics-server repo
+  git:
+    accept_hostkey: true
+    depth: 1
+    dest: "{{ temp_directory }}/metrics-server"
+    repo: https://github.com/kubernetes-sigs/metrics-server.git
+    version: "v{{ metrics_server_version }}"
+
+- name: Find K8S resource files
+  find:
+    file_type: file
+    paths: "{{ temp_directory }}/metrics-server/deploy/1.8+/"
+    patterns: "*.yaml"
+    recurse: false
+  register: k8s_files_matched
+
+- name: Create K8S resources
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('file',
+      '{{ file.path }}')|from_yaml_all|select('ne', None)|list }}"
+    state: "{{ state }}"
+  loop: "{{ k8s_files_matched.files }}"
+  loop_control:
+    loop_var: file

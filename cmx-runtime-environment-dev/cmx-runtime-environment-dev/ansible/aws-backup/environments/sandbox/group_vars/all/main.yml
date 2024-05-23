@@ -1,0 +1,31 @@
+---
+# Environment name
+env: "sandbox"
+
+# AWS account id number for env
+aws_account_id: "843902778531"
+
+# AWS region of env
+region: "us-east-1"
+
+# Region to copy backups to
+aws_dst_region: "us-west-2"
+
+# Region in which resources reside and in which primary backup
+# is stored and executed
+aws_src_region: "{{ region }}"
+
+# Enable KMS key rotation
+enable_key_rotation: true
+
+# Management bucket to stote tfstate within
+management_bucket: "management.sandbox.app.vobasolutions.com"
+
+# Tag(s) to apply to all created resources
+shared_resource_tags:
+  BillingCategory: "DR"
+  BillingTeam: "Engineering"
+  BillingEnvironment: "{{ env|title }}"
+  BillingApplication: "CMx"
+  Environment: "{{ env }}"
+  Usage: "CodaMetrix DR"

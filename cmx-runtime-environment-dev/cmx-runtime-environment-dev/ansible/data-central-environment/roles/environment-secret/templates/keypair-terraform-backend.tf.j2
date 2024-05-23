@@ -1,0 +1,7 @@
+terraform {
+  backend "s3" {
+    bucket = "{{ management_bucket }}"
+    key    = "terraform/data-central-ssh-keypair-{{ env }}/terraform.tfstate"
+    region = "{{ region }}"
+  }
+}

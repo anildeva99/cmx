@@ -1,0 +1,15 @@
+---
+- name: Run all playbooks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+
+# Provision environment, configure it
+- name: Import provision-environment.yml
+  import_playbook: provision-environment.yml
+- name: Import configure-bastions.yml
+  import_playbook: configure-bastions.yml
+- name: Import prepare-database.yml
+  import_playbook: prepare-database.yml

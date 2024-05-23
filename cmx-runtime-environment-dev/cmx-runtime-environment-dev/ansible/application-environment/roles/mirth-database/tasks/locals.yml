@@ -1,0 +1,12 @@
+---
+- name: Generate script to update the application mirth passwords/secrets
+  template:
+    dest: "{{ temp_directory }}/update-mirth-db-passwords-{{ env }}.sh"
+    mode: 0750
+    src: update-mirth-db-password.sh.j2
+
+- name: Generate script to update the ingress mirth passwords/secrets
+  template:
+    dest: "{{ temp_directory }}/update-ingress-mirth-db-passwords-{{ env }}.sh"
+    mode: 0750
+    src: update-ingress-mirth-db-password.sh.j2

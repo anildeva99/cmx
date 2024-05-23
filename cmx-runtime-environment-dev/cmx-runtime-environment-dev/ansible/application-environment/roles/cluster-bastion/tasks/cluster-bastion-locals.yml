@@ -1,0 +1,83 @@
+---
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+# Do above for all of the below
+- name: "Lookup public key of cluster bastion in
+    AWS secret manager for each developer"
+  set_fact:
+    cluster_bastion_keypair_public_key : "{{ lookup('aws_secret',
+      'CodaMetrixApplication/Developers/cluster-bastion-{{ env }}-{{ dev.name|lower }}-id_ssh_rsa.pub',
+      errors='ignore',
+      region=region) }}"
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+  register: cluster_bastion_developer_public_key_returned_value
+
+- name: Generate developer keypairs for the cluster bastion
+  community.crypto.openssh_keypair:
+    path: "{{ temp_directory }}/cluster-bastion-{{ env }}-{{ dev_key[0].name|lower }}-id_ssh_rsa"
+    size: 4096
+    state: "{{ state }}"
+    type: rsa
+  loop: "{{ developers|product(cluster_bastion_developer_public_key_returned_value.results)|list }}"
+  loop_control:
+    loop_var: dev_key
+  register: cluster_bastion_developer_id_ssh_rsa
+  when: (dev_key[1] is succeeded) and
+        (dev_key[1].dev.name == dev_key[0].name) and
+        (dev_key[1].ansible_facts.cluster_bastion_keypair_public_key
+          == aws_secret_manager_secret_key_initial_value)
+
+- name: Load private key content into variable
+  slurp:
+    src: "{{ temp_directory }}/cluster-bastion-{{ env }}-{{ dev_key[0].name|lower }}-id_ssh_rsa"
+  loop: "{{ developers|product(cluster_bastion_developer_public_key_returned_value.results)|list }}"
+  loop_control:
+    loop_var: dev_key
+  register: slurped_cluster_bastion_developer_keypair_data
+  when: (dev_key[1] is succeeded) and
+        (dev_key[1].dev.name == dev_key[0].name) and
+        (dev_key[1].ansible_facts.cluster_bastion_keypair_public_key
+          == aws_secret_manager_secret_key_initial_value)
+
+- name: Store bastion private keys in secret manager
+  community.aws.aws_secret:
+    name: "CodaMetrixApplication/Developers/{{ dev_priv_key[1].source.split('/')[7]|lower }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ dev_priv_key[1].content|b64decode }}"
+    state: present
+  loop: "{{ developers|product(slurped_cluster_bastion_developer_keypair_data.results)|list }}"
+  loop_control:
+    loop_var: dev_priv_key
+  when: ('source' in dev_priv_key[1]) and
+        (dev_priv_key[1].dev_key[0].name == dev_priv_key[0].name)
+
+- name: Store bastion public keys for each developer in secret manager
+  community.aws.aws_secret:
+    name: "CodaMetrixApplication/Developers/{{ dev_pub_key[1].filename.split('/')[7]|lower }}.pub"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ dev_pub_key[1].public_key }}"
+    state: present
+  loop: "{{ developers|product(cluster_bastion_developer_id_ssh_rsa.results)|list }}"
+  loop_control:
+    loop_var: dev_pub_key
+  when: ('public_key' in dev_pub_key[1]) and
+        (dev_pub_key[1].dev_key[0].name == dev_pub_key[0].name)
+
+- name: Delete cluster bastion private key file for each developer
+  file:
+    path: "{{ temp_directory }}/cluster-bastion-{{ env }}-{{ priv_key.name|lower }}-id_ssh_rsa"
+    state: absent
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: priv_key
+
+- name: Delete cluster bastion public key file for each developer
+  file:
+    path: "{{ temp_directory }}/cluster-bastion-{{ env }}-{{ pub_key.name|lower }}-id_ssh_rsa.pub"
+    state: absent
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: pub_key

@@ -1,0 +1,6 @@
+---
+- name: Generate update-new-relic-license-key-<env>.sh from template
+  template:
+    dest: "{{ temp_directory }}/update-new-relic-license-key-{{ env }}.sh"
+    mode: 0750
+    src: update-new-relic-license-key.sh.j2

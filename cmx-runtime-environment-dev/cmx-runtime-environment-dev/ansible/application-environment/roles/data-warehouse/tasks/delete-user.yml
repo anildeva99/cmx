@@ -1,0 +1,100 @@
+---
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+# Do for all plays below
+- name: Revoke access to all tables in the codametrix database
+  community.postgresql.postgresql_query:
+    db: "{{ application_data_warehouse_name }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA spectrum_schema FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA spectrum_schema FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA customer_views FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA customer_views FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA reports FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA reports FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+
+- name: Revoke access to customer schemas in the codametrix database
+  community.postgresql.postgresql_query:
+    db: "{{ application_data_warehouse_name }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA {{ sys }} FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA {{ sys }} REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+  loop: "{{ healthsystems }}"
+  loop_control:
+    loop_var: sys
+
+- name: Revoke access to all tables in the cmx database
+  community.postgresql.postgresql_query:
+    db: cmx
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA spectrum_schema FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA spectrum_schema FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA customer_views FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA customer_views FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA reports FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA reports FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+
+- name: Revoke access to all tables in the customer databases
+  community.postgresql.postgresql_query:
+    db: "{{ sys }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA spectrum_schema FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA spectrum_schema FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA customer_views FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA customer_views FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA reports FROM {{ delete_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports REVOKE ALL PRIVILEGES ON TABLES FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA reports FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+  loop: "{{ healthsystems }}"
+  loop_control:
+    loop_var: sys
+
+- name: Delete a single Redshift user (role)
+  redshift_user:
+    db: "{{ application_data_warehouse_name }}"
+    expires: "infinity"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    state: absent
+    user: "{{ delete_user|lower }}"

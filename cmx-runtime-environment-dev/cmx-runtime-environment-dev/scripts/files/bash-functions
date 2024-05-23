@@ -1,0 +1,1968 @@
+#--------------------------------------------------------------------------
+# Description: Bash functions designed to be used by other scripts
+# vim: tabstop=4 expandtab softtabstop=4 shiftwidth=4 ft=sh
+# shellcheck shell=bash
+#--------------------------------------------------------------------------
+
+#--------------------------------------------------------------------------
+# Helper Functions: functions designed to be used by other functions
+#--------------------------------------------------------------------------
+
+# Checksum $FILE $BINARY
+# Description: Test checksum of downloaded files
+# Return: 0 == Checksum match, 1 == Checksum differs
+Checksum() {
+
+    local _FILE="${1}" \
+        _BINARY="${2}"
+
+    if [ ! -f "${_FILE}" ]; then
+        Error "${_FILE} does not exist"
+        return 1
+    fi
+
+    if [ ! -f "${_BINARY}" ]; then
+        Error "${_BINARY} does not exist"
+        return 1
+    fi
+
+    if (TestCmdInPath "openssl"); then
+
+        local _GET_FSUM \
+            _FSUM \
+            _BSUM
+        _GET_FSUM="$(<"${_FILE}")"
+        _FSUM="${_GET_FSUM%% *}"
+        _BSUM="$(openssl sha1 -sha256 "${_BINARY}" | awk '{print $NF}')"
+
+        if [ "${_FSUM}" != "${_BSUM}" ]; then
+            return 1
+        else
+            return 0
+        fi
+    else
+        Error "openssl not in PATH"
+        return 1
+    fi
+
+}
+
+# ChecksumInstallUpdate $BIN_DIR $BINARY_NAME $CHECKSUM_FILE $URL
+# Description: Download checksum for binary in order to
+#   decide if install/update is needed
+# Return: 0 == Checksum match, 1 == Checksum differs,
+#   RUN_INSTALL_TASKS == 1 (if binary was installed or updated)
+ChecksumInstallUpdate() {
+
+    local _BIN_DIR="${1:-"${HOME}/bin"}" \
+        _BINARY_NAME="${2}" \
+        _CHECKSUM_FILE="${3}" \
+        _URL="${4}"
+
+    export RUN_INSTALL_TASKS=0
+
+    if [ -d "${_BIN_DIR}/src" ]; then
+        mkdir -p "${_BIN_DIR}/src"
+    fi
+
+    if [ -z "${_BINARY_NAME}" ]; then
+        Error "${FUNCNAME[0]} requires \$2 == BINARY_NAME"
+        return 1
+    fi
+
+    if [ -z "${_CHECKSUM_FILE}" ]; then
+        Error "${FUNCNAME[0]} requires \$3 == CHECKSUM_FILE"
+        return 1
+    fi
+
+    if [ -z "${_URL}" ]; then
+        Error "${FUNCNAME[0]} requires \$4 == URL"
+        return 1
+    fi
+
+    if [ ! -d "${_BIN_DIR}/src" ]; then
+        mkdir -p "${_BIN_DIR}/src"
+    fi
+
+    if [ ! -f "${_BIN_DIR}/src/${_CHECKSUM_FILE}" ]; then
+        Info "Download latest checksum of ${_BINARY_NAME}..."
+        curl -L -o "${_BIN_DIR}/src/${_CHECKSUM_FILE}" \
+            "${_URL}/${_CHECKSUM_FILE}" &>/dev/null
+    fi
+
+    if [ ! -f "${_BIN_DIR}/src/${_BINARY_NAME}" ]; then
+        Info "Downloading ${_BINARY_NAME}..."
+        curl -L -o "${_BIN_DIR}/src/${_BINARY_NAME}" \
+            "${_URL}/${_BINARY_NAME}" &>/dev/null
+        RUN_INSTALL_TASKS=1
+    else
+        if (! Checksum "${_BIN_DIR}/src/${_CHECKSUM_FILE}" \
+            "${_BIN_DIR}/src/${_BINARY_NAME}"); then
+            Info "Updating ${_BINARY_NAME}..."
+            curl -L -o "${_BIN_DIR}/src/${_BINARY_NAME}" \
+                "${_URL}/${_BINARY_NAME}" &>/dev/null
+            RUN_INSTALL_TASKS=1
+        fi
+    fi
+
+    if (Checksum "${_BIN_DIR}/src/${_CHECKSUM_FILE}" \
+        "${_BIN_DIR}/src/${_BINARY_NAME}"); then
+        return 0
+    else
+        return 1
+    fi
+
+}
+
+# CreateVirtualenv $PYTHON_VERSION $VENV_NAME
+# Description: Create $VENV_NAME using $PYTHON_VERSION
+# Return: 1 == Failure, 0 === Success
+CreateVirtualenv() {
+
+    local _PYTHON_VERSION="${1}" \
+        _VENV_NAME="${2}"
+
+    if [ -z "${_PYTHON_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == PYTHON_VERSION"
+        return 1
+    fi
+
+    if [ -z "${_VENV_NAME}" ]; then
+        Error "${FUNCNAME[0]} requires \$2 == VENV_NAME"
+        return 1
+    fi
+
+    # Add pyenv to PATH if it's not in PATH
+    if (! TestCmdInPath "pyenv"); then
+        export PYENV_ROOT="${HOME}/.pyenv"
+        export PATH="${PYENV_ROOT}/bin:${PATH}"
+        eval "$(pyenv init -)"
+    fi
+
+    # Init pyenv-virtualenv plugin
+    # NOTE: pyenv-virtualenv is required else return 1
+    if [ -d "${HOME}/.pyenv/plugins/pyenv-virtualenv" ]; then
+        eval "$(pyenv virtualenv-init -)"
+    else
+        Error "pyenv-virtualenv not installed"
+        return 1
+    fi
+
+    # Test if VERSION exists in pyenv
+    # if it does install
+    local _AVAIL_VERSIONS
+    _AVAIL_VERSIONS="$(pyenv install --list |
+        awk '/  3.*/ && !/-dev/ {print}')"
+    if (echo "${_AVAIL_VERSIONS}" | grep -q "${_PYTHON_VERSION}"); then
+        Info "Creating venv ${_VENV_NAME} using ${_PYTHON_VERSION}..."
+        pyenv virtualenv "${_PYTHON_VERSION}" "${_VENV_NAME}" &>/dev/null
+        return 0
+    else
+        Error "Python version ${_VERSION} does not exist"
+        return 1
+    fi
+
+}
+
+# Error $MSG $NEWLINE
+# Description: Echo ERROR message, newline by default
+# Return: Nothing
+Error() {
+
+    local _MSG="${1}" \
+        _NEWLINE="${2:-"newline"}"
+
+    if [ "${_NEWLINE}" = "newline" ]; then
+        echo -e "$(tput bold)$(tput setaf 1)ERROR : ${_MSG}$(tput sgr0)\n"
+    else
+        echo -e "$(tput bold)$(tput setaf 1)ERROR : ${_MSG}$(tput sgr0)"
+    fi
+
+    zshCompat del
+
+}
+
+# ExportAWSCredentials $AWS_PROFILE
+# Description: Export AWS credentials for $AWS_PROFILE
+# Return: $_AWS_PROFILE $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+#   $AWS_SESSION_TOKEN
+ExportAWSCredentials() {
+
+    zshCompat add
+
+    local _PROFILE="${1}" \
+        _CALLER_ID \
+        _ACCOUNT_ID \
+        _CREDS \
+        _CREDS_ARRAY
+
+    if (! TestCmdInPath "jq"); then
+        Error "${FUNCNAME[0]} requires util: jq"
+        return 1
+    fi
+
+    if (! TestCmdInPath "aws"); then
+        Error "${FUNCNAME[0]} requires util: aws"
+        return 1
+    fi
+
+    unset AWS_DEFAULT_PROFILE \
+        AWS_ACCESS_KEY_ID \
+        AWS_SECRET_ACCESS_KEY \
+        AWS_SESSION_TOKEN \
+        AWS_PROFILE \
+        _AWS_PROFILE
+
+    # shellcheck disable=SC2031
+    export AWS_PROFILE="${_PROFILE}"
+    tput bold && \
+        _CALLER_ID="$(aws sts get-caller-identity \
+            --output json &> /dev/stdout)" && \
+        tput sgr0
+    if (echo "${_CALLER_ID}" | grep -iq 'Account'); then
+        Info "\n${_CALLER_ID}"
+    else
+        Error "Could not assume role for profile: ${_PROFILE}"
+        return 1
+    fi
+    unset AWS_PROFILE
+
+    _ACCOUNT_ID="$(echo "${_CALLER_ID}" | jq -r .Account)"
+    if [ -d "${HOME}/.aws/cli/cache" ]; then
+        _CREDS="$(awk "/${_ACCOUNT_ID}/ {print}" \
+            "${HOME}"/.aws/cli/cache/*.json |
+            jq -r '.Credentials|.AccessKeyId,.SecretAccessKey,.SessionToken')"
+        IFS=" " read -r -a _CREDS_ARRAY <<<"${_CREDS//$'\n'/ }"
+        # shellcheck disable=SC2031
+        export AWS_ACCESS_KEY_ID="${_CREDS_ARRAY[0]}" \
+            AWS_SECRET_ACCESS_KEY="${_CREDS_ARRAY[1]}" \
+            AWS_SESSION_TOKEN="${_CREDS_ARRAY[2]}" \
+            _AWS_PROFILE="${_PROFILE}"
+    fi
+
+    zshCompat del
+
+}
+
+# ExportAWSSTSCredentials $AWS_PROFILE
+# Description: Export AWS STS credentials for $AWS_PROFILE
+# Return: $_AWS_PROFILE $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+#   $AWS_SESSION_TOKEN $AWS_ROLE_SESSION_NAME
+ExportAWSSTSCredentials() {
+
+    zshCompat add
+
+    local _PROFILE="${1}" \
+        _CREDS \
+        _CALLER_ID \
+        _STS_DURATION \
+        _MFA_TOKEN_CODE \
+        _MFA_SERIAL \
+        _AWS_ROLE_SESSION_NAME \
+        _CREDS_ARRAY \
+        PS3
+
+    if (! TestCmdInPath "jq"); then
+        Error "${FUNCNAME[0]} requires util: jq"
+        return 1
+    fi
+
+    if (! TestCmdInPath "aws"); then
+        Error "${FUNCNAME[0]} requires util: aws"
+        return 1
+    fi
+
+    # Parse ${HOME}/.aws/credentials for _PROFILE
+    # settings using INIParser
+    if [ ! -f "${HOME}/.aws/credentials" ]; then
+        Error "${FUNCNAME[0]} requires ${HOME}/.aws/credentials"
+        return 1
+    else
+        INIParser "${HOME}/.aws/credentials"
+        _INI.section."${_PROFILE}"
+
+        # shellcheck disable=SC2154
+        _MFA_SERIAL="${mfa_serial:-""}"
+        if [ -z "${_MFA_SERIAL}" ]; then
+            Error "Failed to parse ${HOME}/.aws/credentials for mfa_serial"
+            return 1
+        fi
+
+        # shellcheck disable=SC2154
+        # Default to 2 hour if duration_seconds
+        # missing from profile config
+        _STS_DURATION="${duration_seconds:-"7200"}"
+
+        # shellcheck disable=SC2154
+        _AWS_ROLE_SESSION_NAME="${role_session_name:-"${USER}"}"
+
+    fi
+
+    unset AWS_DEFAULT_PROFILE \
+        AWS_ACCESS_KEY_ID \
+        AWS_SECRET_ACCESS_KEY \
+        AWS_SESSION_TOKEN \
+        AWS_PROFILE \
+        _AWS_PROFILE \
+        AWS_ROLE_SESSION_NAME
+
+    read -rsp "$(Info "Enter MFA code for ${_MFA_SERIAL}: ")"  _MFA_TOKEN_CODE
+
+    # shellcheck disable=SC2031
+    export AWS_PROFILE="${_PROFILE}"
+    _CREDS="$(aws sts get-session-token \
+        --duration-seconds "${_STS_DURATION}" \
+        --serial-number "${_MFA_SERIAL}" \
+        --token-code "${_MFA_TOKEN_CODE}" \
+        --output json | \
+        jq -r '.Credentials|.AccessKeyId,.SecretAccessKey,.SessionToken')"
+    unset AWS_PROFILE
+    IFS=" " read -r -a _CREDS_ARRAY <<<"${_CREDS//$'\n'/ }"
+    # shellcheck disable=SC2031
+    export AWS_ACCESS_KEY_ID="${_CREDS_ARRAY[0]}" \
+        AWS_SECRET_ACCESS_KEY="${_CREDS_ARRAY[1]}" \
+        AWS_SESSION_TOKEN="${_CREDS_ARRAY[2]}" \
+        AWS_ROLE_SESSION_NAME="${_AWS_ROLE_SESSION_NAME}" \
+        _AWS_PROFILE="${_PROFILE}"
+
+    _CALLER_ID="$(aws sts get-caller-identity --output json)"
+    unset AWS_PROFILE
+    if (echo "${_CALLER_ID}" | grep -iq 'Account'); then
+        Info "\n\n${_CALLER_ID}"
+    else
+        Error "Failed getting STS credentials"
+        return 1
+    fi
+
+    zshCompat del
+
+}
+
+# Info $MSG $NEWLINE
+# Description: Echo bold message, newline by default
+# Return: Nothing
+Info() {
+
+    local _MSG="${1}" \
+        _NEWLINE="${2:-"newline"}"
+
+    if [ "${_NEWLINE}" = "newline" ]; then
+        echo -e "$(tput bold)${_MSG}$(tput sgr0)\n"
+    else
+        echo -e "$(tput bold)${_MSG}$(tput sgr0)"
+    fi
+}
+
+# INIParser $FILE
+# Description: Adapted from https://gist.github.com/splaspood/1473761
+#   Parse ini file into functions named _INI.section.<sectioname>, and then
+#   when running the function set each key=value to a bash varible
+# Return: Bash functions: _INI.section.<sectioname>
+INIParser() {
+
+    local _FILE="${1}"
+    if [ -f "${_FILE}" ]; then
+        _FILE="$(<"${1}")"
+        _FILE="${_FILE// = /=}" # fix ' = ' to be '='
+    else
+        Error "${FUNCNAME[0]} requires \$1 == FILE"
+        return 1
+    fi
+
+    local _INI
+
+    # NOTE: Check below is disabled because we want bash to perform
+    # word splitting
+    # shellcheck disable=SC2206
+    IFS=$'\n' _INI=(${_FILE}) # convert to line-array
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]//;*/}) # remove comments
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]/#[/\}$'\n'_INI.section.}) # set section prefix
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]/%]/ \(}) # convert text2function (1)
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]/=/=\( }) # convert item to array
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]/%/ \)}) # close array parenthesis
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]/%\( \)/\(\) \{}) # convert text2function (2)
+    # shellcheck disable=SC2206
+    _INI=(${_INI[*]/%\} \)/\}}) # remove extra parenthesis
+    # shellcheck disable=SC2206
+    _INI[0]='' # remove first element
+    # shellcheck disable=SC2206
+    _INI[${#_INI[*]} + 1]='}' # add the last brace
+    eval "${_INI[*]}"         # eval the result
+
+}
+
+# InstallPython $PYTHON_VERSION
+# Description: Install PYTHON_VERSION using pyenv
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallPython() {
+
+    local _VERSION="${1}"
+
+    if [ -z "${_VERSION}" ]; then
+        Error "InstallPython requires \$1 == PYTHON_VERSION"
+        return 1
+    fi
+
+    # Add pyenv to PATH if it's not in PATH
+    # NOTE: pyenv is required else return 1
+    if (! TestCmdInPath "pyenv"); then
+        if [ -d "${HOME}/.pyenv" ]; then
+            export PYENV_ROOT="${HOME}/.pyenv" \
+                PATH="${PYENV_ROOT}/bin:${PATH}"
+            eval "$(pyenv init -)"
+        else
+            Error "${HOME}/.pyenv does not exist"
+            return 1
+        fi
+    fi
+
+    # Test if VERSION exists in pyenv
+    # if it does install
+    local _AVAIL_VERSIONS
+    _AVAIL_VERSIONS="$(pyenv install --list |
+        awk '/  3.*/ && !/-dev/ {print}')"
+    if (echo "${_AVAIL_VERSIONS}" | grep -q "${_VERSION}"); then
+        if [ ! -d "${HOME}/.pyenv/versions/${_PYTHON_VERSION}" ]; then
+            Info "Installing python ${_VERSION}..."
+            pyenv install "${_VERSION}"
+        fi
+    else
+        Error "Python version ${_VERSION} does not exist"
+        return 1
+    fi
+
+}
+
+# InstallRequirements $PYTHON_VERSION $VENV_NAME $REQ_FILE
+# Description: Install/Update python modules in $REQ_FILE
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallRequirements() {
+
+    local _PYTHON_VERSION="${1}" \
+        _VENV_NAME="${2}" \
+        _REQ_FILE="${3}"
+
+    if [ -z "${_PYTHON_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == PYTHON_VERSION"
+        return 1
+    fi
+
+    if [ -z "${_VENV_NAME}" ]; then
+        Error "${FUNCNAME[0]} requires \$2 == VENV_NAME"
+        return 1
+    fi
+
+    if [ -z "${_REQ_FILE}" ]; then
+        Error "${FUNCNAME[0]} requires \$3 == REQ_FILE"
+        return 1
+    fi
+
+    if [ -z "${SCRIPT_DIR}" ]; then
+        SCRIPT_DIR="$(GetRealPath "${0}")"
+    fi
+
+    # Add pyenv to PATH if it's not in PATH
+    if (TestCmdInPath "pyenv"); then
+        export PYENV_ROOT="${HOME}/.pyenv"
+        export PATH="${PYENV_ROOT}/bin:${PATH}"
+        eval "$(pyenv init -)"
+    fi
+
+    # Init pyenv-virtualenv plugin
+    # NOTE: pyenv-virtualenv is required else return 1
+    if [ -d "${HOME}/.pyenv/plugins/pyenv-virtualenv" ]; then
+        eval "$(pyenv virtualenv-init -)"
+    else
+        Error "pyenv-virtualenv not installed"
+        return 1
+    fi
+
+    # Attempt to activate VENV_NAME
+    export PYENV_VIRTUALENV_DISABLE_PROMPT=1
+    pyenv activate "${_PYTHON_VERSION}/envs/${_VENV_NAME}" &>/dev/null
+    if [ "$?" = "1" ]; then
+        Error "Virtual env ${_PYTHON_VERSION}/envs/${_VENV_NAME} does not exist"
+        return 1
+    fi
+
+    if [ ! -f "${_REQ_FILE}" ]; then
+        Error "${_REQ_FILE} not found"
+        return 1
+    else
+        if (TestCmdInPath "pip"); then
+
+            # Compare installed moduels with those in ${REQ_FILE}
+            local _CURRENT_REQS \
+                _CURRENT_ARRAY \
+                _REQ_FILE_REQS
+            _CURRENT_REQS="$(pip list --format=freeze \
+                --no-color --disable-pip-version-check | sort)"
+
+            # Create bash 3.x array out of _CURRENT_REQS
+            IFS=" " read -r -a _CURRENT_ARRAY <<<"${_CURRENT_REQS//$'\n'/ }"
+            _REQ_FILE_REQS="$(echo "$(<"${_REQ_FILE}")" | sort)"
+            if [ "${#_CURRENT_ARRAY[@]}" -le 1 ]; then
+                Info "No existing modules installed, performing initial install..."
+                pip install -r "${_REQ_FILE}"
+            else
+                if (! diff <(echo "${_CURRENT_REQS}") \
+                    <(echo "${_REQ_FILE_REQS}") &>/dev/null); then
+                    Info "Modules require updates..."
+                    pip uninstall -y -r <(pip freeze) &>/dev/null
+                    pip install -r "${_REQ_FILE}"
+                    echo ""
+                else
+                    Info "Modules already installed and no updates are required..."
+                fi
+            fi
+        else
+            Error "pip binary not found"
+            return 1
+        fi
+    fi
+}
+
+# GetRealPathe $1
+# Description: Portable function to get real path to a script
+# Return: PATH
+GetRealPath() {
+
+    if [[ -n "${NO_SYMLINKS}" ]]; then
+        local _PWDP='pwd -P'
+    else
+        local _PWDP='pwd'
+    fi
+    echo "$(
+        cd "${1%/*}" 2>/dev/null || return 1
+        ${_PWDP}
+    )"
+}
+
+# PrintAWSAccount
+# Description: Determine AWS account ID and echo result
+# Return: Nothing
+PrintAWSAccount() {
+
+    local _ACCOUNT_ID
+
+    if (TestCmdInPath "aws" ); then
+        _ACCOUNT_ID="$(aws sts get-caller-identity --query 'Account' \
+            --output text)"
+        if [ -n "${_ACCOUNT_ID}" ]; then
+            echo "${_ACCOUNT_ID}"
+        else
+            Error "Could not determine AWS account ID"
+            return 1
+        fi
+    else
+        Error "aws not in PATH"
+        return 1
+    fi
+
+}
+
+# PrintAWSCredentials
+# Description: Prints AWS credentials env vars to STDOUT
+# Return: Nothing
+PrintAWSCredentials() {
+
+    Info "AWS_PROFILE: ${_AWS_PROFILE:-""}"
+    # shellcheck disable=SC2031
+    Info "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-""}"
+    # shellcheck disable=SC2031
+    Info "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-""}"
+    # shellcheck disable=SC2031
+    Info "AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-""}"
+
+}
+
+# Success $1
+# Description: Echo bold/green message with newline
+# Return: Nothing
+Success() {
+
+    local _MSG="${1}" \
+        _NEWLINE="${2:-"newline"}"
+
+    if [ "${_NEWLINE}" = "newline" ]; then
+        echo -e "$(tput bold)$(tput setaf 2)${_MSG}$(tput sgr0)\n"
+    else
+        echo -e "$(tput bold)$(tput setaf 2)${_MSG}$(tput sgr0)"
+    fi
+}
+
+# SwitchProfileRunCMD $PROFILE $CMD_TO_RUN
+# Description: Switch to a different AWS profile for just
+#   running $CMD_TO_RUN
+# Return: Nothing
+SwitchProfileRunCMD() {
+
+    zshCompat add
+    local _PROFILE="${1}"
+
+    if [ -z "${_PROFILE}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == PROFILE"
+        return 1
+    fi
+
+    if [ "${#}" -lt 2 ]; then
+        Error "${FUNCNAME[0]} requires \$2 == CMD_TO_RUN"
+        return 1
+    else
+        shift
+        local _CMD_TO_RUN=("${@}")
+    fi
+
+    (
+
+        unset AWS_DEFAULT_PROFILE \
+            AWS_ACCESS_KEY_ID \
+            AWS_SECRET_ACCESS_KEY \
+            AWS_SESSION_TOKEN \
+            AWS_PROFILE
+
+        # NOTE: For now going to not set AWS_PROFILE
+        # as certain ansible modules fails when both AWS_PROFILE and
+        # AWS_ACCESS_KEY_ID are defined
+        # shellcheck disable=SC2030
+        export AWS_PROFILE="${_PROFILE}"
+        _CALLER_ID="$(aws sts get-caller-identity --output json)"
+        if (! echo "${_CALLER_ID}" | grep -iq 'Account'); then
+            Error "Could not assume role for profile: ${_PROFILE}"
+            return 1
+        fi
+        unset AWS_PROFILE
+
+        # If jq is installed also set
+        # AWS_ACCESS_KEY_ID
+        # AWS_SECRET_ACCESS_KEY
+        # AWS_SESSION_TOKEN
+        # to support aws commands which don't support profile option
+        if (TestCmdInPath "jq"); then
+            _ACCOUNT_ID="$(echo "${_CALLER_ID}" | jq -r .Account)"
+            if [ -d "${HOME}/.aws/cli/cache" ]; then
+                _CREDS="$(awk "/${_ACCOUNT_ID}/ {print}" \
+                    "${HOME}"/.aws/cli/cache/*.json |
+                    jq -r '.Credentials|.AccessKeyId,.SecretAccessKey,.SessionToken')"
+                IFS=" " read -r -a _CREDS_ARRAY <<<"${_CREDS//$'\n'/ }"
+                # shellcheck disable=SC2030
+                export AWS_ACCESS_KEY_ID="${_CREDS_ARRAY[0]}" \
+                    AWS_SECRET_ACCESS_KEY="${_CREDS_ARRAY[1]}" \
+                    AWS_SESSION_TOKEN="${_CREDS_ARRAY[2]}"
+            fi
+        fi
+
+        eval "${_CMD_TO_RUN[@]}"
+
+    )
+
+    zshCompat del
+
+}
+
+# TestCmdInPath $CMD
+# Description: Test if CMD in PATH
+# Return: 1 == (CMD not in path), 0 == (CMD in PATH)
+TestCmdInPath() {
+
+    local _CMD="${1}"
+
+    if (! command -v "${_CMD}" &>/dev/null); then
+        return 1
+    else
+        return 0
+    fi
+}
+
+# TestFilesDiffer $FILE1 $FILE2
+# Description: Test if CMD in PATH
+# Return: 1 == (files differ), 0 == (files are the same)
+TestFilesDiffer() {
+
+    local _FILE1="${1}" \
+        _FILE2="${2}"
+
+    if (! cmp "${_FILE1}" "${_FILE2}"); then
+        return 1
+    else
+        return 0
+    fi
+}
+
+# zshCompat $ACTION
+# Description: Add or subtract zsh compat options to shell
+# Return: Nothing
+zshCompat() {
+
+    local _ACTION="${1}"
+
+    if [ -n "${ZSH_VERSION}" ]; then
+        if [ "${_ACTION}" = "add" ]; then
+            emulate sh
+        else
+            emulate zsh
+        fi
+    fi
+}
+
+#--------------------------------------------------------------------------
+# General Functions: functionsto be used by external scripts
+#--------------------------------------------------------------------------
+
+BastionTunnel() {
+
+    local _HELP="
+    USAGE:
+        btunnel <OPTIONS>
+
+    OPTIONS:
+        -a <remote-address>
+            Remote target address within VPC you want to create a tunnel too.
+
+        -e
+            Use kubefwd to connect to pod in kubernetes rather
+            than the cluster-bastion.
+
+        -h
+            Print usage.
+
+        -i
+            Connect to the ingress VPC.
+
+        -k
+            Tunnel to a service in kubernetes.
+
+        -l <local-port-number>
+            Local listening port.
+
+        -p <application-profile>
+            Use a profile besides the one specified in
+            CMX_APPLICATION_PROFILE ${CMX_APPLICATION_PROFILE}
+            (This is synonymous with CMX_ENV and will be used to source
+            ~/.codametrix/<cmx-env>/bastion_settings).
+
+        -r <remote-port-number>
+            Remote port of target address.
+
+    EXAMPLES:
+        1) Tunnel to application RDS in sandbox env:
+            btunnel -p sandbox -a <rds-endpoint> -l 5432 -r 5432
+
+        2) Tunnel to elastic search in sandbox env:
+            btunnel -p sandbox -a <es-endpoint> -l 8443 -r 8443
+
+    "
+
+    local OPTIND
+        _ADDRESS="" \
+        _EXPERIMENTAL=0 \
+        _INGRESS=0 \
+        _K8S=0 \
+        _LOCAL_PORT="" \
+        _CMX_ENV="${CMX_APPLICATION_PROFILE}" \
+        _REMOTE_PORT="" \
+        _BASTION_ADDRESS="" \
+        _CLUSTER_ADDRESS="" \
+        _KUBECTL_NAMESPACE="" \
+        _REMOTE_ADDRESS=""
+
+    while getopts a:ehikl:p:r: _OPT; do
+        case "${_OPT}" in
+            a) _ADDRESS="${OPTARG}" ;;
+            e) _EXPERIMENTAL=1 ;;
+            h)
+                Info "${_HELP}"
+                return 1
+            ;;
+            i) _INGRESS=1 ;;
+            k) _K8S=1 ;;
+            l) _LOCAL_PORT="${OPTARG}" ;;
+            p) _CMX_ENV="${OPTARG}" ;;
+            r) _REMOTE_PORT="${OPTARG}" ;;
+            :)
+                Error "Option -${OPTARG} requires an argument.\n"
+                Info "${_HELP}"
+                return 1
+            ;;
+            [?])
+                Info "${_HELP}"
+                return 1
+            ;;
+        esac
+    done
+
+    shift $((OPTIND - 1))
+
+    if [ "${_CMX_ENV}" != "" ]; then
+        if [ -f "${HOME}/.codametrix/${_CMX_ENV}/bastion_settings" ]; then
+            # shellcheck source=/dev/null
+            . "${HOME}/.codametrix/${_CMX_ENV}/bastion_settings"
+        else
+            Error "${HOME}/.codametrix/${_CMX_ENV}/bastion_settings is missing"
+            return 1
+        fi
+    fi
+
+    # Check for bastion_username
+    if [ -z "${bastion_username}" ]; then
+        read -r -p "$(Info "Enter bastion username: ")" bastion_username
+    fi
+
+    # Check for bastion_key
+    while [[ -z "${bastion_key}" || ! -f "${bastion_key}" ]]; do
+        read -r -p "$(Info "Enter path to bastion SSH key: ")" bastion_key
+        if [ ! -f "${bastion_key}" ]; then
+            Error "${bastion_key} does not exist"
+        fi
+    done
+
+    # Check for ingress_bastion_address or bastion_address
+    # and set _BASTION_ADDRESS
+    if [ "${_INGRESS}" != "0" ]; then
+        # shellcheck disable=SC2154
+        if [ -z "${ingress_bastion_address}" ]; then
+            read -r -p "$(Info "Enter ingress bastion address: ")" \
+                ingress_bastion_address
+        fi
+        _BASTION_ADDRESS="${ingress_bastion_address}"
+    else
+        # shellcheck disable=SC2154
+        if [ -z "${bastion_address}" ]; then
+            read -r -p "$(Info "Enter bastion address: ")" bastion_address
+        fi
+        _BASTION_ADDRESS="${bastion_address}"
+    fi
+
+    if [ "${_K8S}" != "0" ]; then
+        # Check cluster bastion address
+        if [ "${_INGRESS}" != "0" ]; then
+            # shellcheck disable=SC2154
+            if [ -z "${ingress_cluster_bastion_address}" ]; then
+                read -r -p "$(Info "Enter cluster bastion address: ")" \
+                    ingress_cluster_bastion_address
+            fi
+            _CLUSTER_ADDRESS="${ingress_cluster_bastion_address}"
+        else
+            # shellcheck disable=SC2154
+            if [ -z "${cluster_bastion_address}" ]; then
+                read -r -p "$(Info "Enter cluster bastion address: ")" \
+                    cluster_bastion_address
+            fi
+            _CLUSTER_ADDRESS="${cluster_bastion_address}"
+	    fi
+    fi
+
+    # Experimental feature: use kubectl to port-forward instead
+    # of cluster bastion
+    if [ "${_EXPERIMENTAL}" !=  "0" ]; then
+	    _K8S=0
+        # Run ChooseProfile to prompt the user for the AWS
+        # profile to use and gain STS credentials for
+        ChooseProfile ""
+
+        # Prompt use for EKS cluster to connect too
+        # thus setting the target context
+        KubeChooseCluster ""
+
+        # shellcheck disable=SC2154
+	    if [ -z "${kubectl_namespace}" ]; then
+		    read -r -p "$(Info "Enter Kubernetes namespace: ")" \
+                _KUBECTL_NAMESPACE
+	    fi
+
+    fi
+
+    # Check for _ADDRESS
+    if [ -z "${_ADDRESS}" ]; then
+        read -r -p "$(Info "Enter remote address you want to tunnel to: ")" \
+            _ADDRESS
+    fi
+
+    # Set _REMOTE_ADDRESS
+    if [[ "${_EXPERIMENTAL}" = "0" && "${_K8S}" = "0"
+            && "${_ADDRESS}" != *"."* && "${_CMX_ENV}" != "" ]]; then
+	    _REMOTE_ADDRESS="${_ADDRESS}.${_CMX_ENV}.application.codametrix.com"
+
+    elif [[ "${_EXPERIMENTAL}" = "0" &&  "${_K8S}" != "0"
+            && "${_ADDRESS}" != *"."* ]]; then
+	    _REMOTE_ADDRESS="${_ADDRESS}.codametrix"
+
+    elif [ ${_EXPERIMENTAL} = "1" ]; then
+        _REMOTE_ADDRESS="service/${_ADDRESS}"
+    else
+        _REMOTE_ADDRESS="${_ADDRESS}"
+    fi
+
+    # Check for _LOCAL_PORT
+    if [ -z "${_LOCAL_PORT}" ]; then
+        read -r -p "$(Info "Enter local listening port: ")" \
+            _LOCAL_PORT
+    fi
+
+    # Check for _REMOTE_PORT
+    if [ -z "${_REMOTE_PORT}" ]; then
+        read -r -p "$(Info "Enter remote port of  ${_REMOTE_ADDRESS}: ")" \
+            _REMOTE_PORT
+    fi
+
+    echo ""
+    Info "Creating tunnel to ${_CMX_ENV} with the following: " no_newline
+    Info "Bastion username: ${bastion_username}" no_newline
+    Info "Bastion key: ${bastion_key}" no_newline
+    Info "Bastion address: ${_BASTION_ADDRESS}" no_newline
+    Info "Local port: ${_LOCAL_PORT}" no_newline
+    Info "Remote port: ${_REMOTE_PORT}" no_newline
+    Info "Remote address: ${_REMOTE_ADDRESS}" no_newline
+
+    if [[ "${_EXPERIMENTAL}" = "0" && "${_K8S}" = "0" ]]; then
+        set -x
+        ssh -o "StrictHostKeyChecking=no" -o \
+            "UserKnownHostsFile=/dev/null" \
+            -i "${bastion_key}" \
+            -N \
+            -L "localhost:${_LOCAL_PORT}:${_REMOTE_ADDRESS}:${_REMOTE_PORT}" \
+            "${bastion_username}@${_BASTION_ADDRESS}"
+        set +x
+    elif [[ "${_EXPERIMENTAL}" = "0" && "${_K8S}" = "1" ]]; then
+        Info "Cluster bastion address: ${_CLUSTER_ADDRESS}"
+        echo ""
+
+        # Select random port between 10000-65000 to use for the tunnel between
+        # the bastion and cluster bastion
+	    local _BASTION_PORT="$(((RANDOM % 55000) + 10000))"
+
+        set -x
+	    ssh -o "StrictHostKeyChecking=no" -o \
+            "UserKnownHostsFile=/dev/null" \
+            -i "${bastion_key}" \
+            -L "localhost:${_LOCAL_PORT}:localhost:${_BASTION_PORT}" \
+            "${bastion_username}@${_BASTION_ADDRESS}" \
+            ssh -o "StrictHostKeyChecking=no" \
+                -o "UserKnownHostsFile=/dev/null" \
+                -i "/home/${bastion_username}/.ssh/cluster_bastion_id_rsa" \
+                -N \
+                -L "localhost:${_BASTION_PORT}:${_REMOTE_ADDRESS}:${_REMOTE_PORT}" \
+                "${bastion_username}@${_CLUSTER_ADDRESS}"
+	    set +x
+        Info "Cleaning up tunnel..."
+        local _TERMINATE_COMMAND="pkill -u ${bastion_username} \"${_REMOTE_ADDRESS}\""
+        set -x
+        ssh -o "StrictHostKeyChecking=no" \
+            -o "UserKnownHostsFile=/dev/null" \
+            -i "${bastion_key}" \
+            "${bastion_username}@${_BASTION_ADDRESS}" "${_TERMINATE_COMMAND}"
+        set +x
+    elif [ ${_EXPERIMENTAL} = "1" ]; then
+
+        if (TestCmdInPath "kubectl"); then
+            KubeCurrentContext
+            Info "AWS Profile: ${_AWS_PROFILE}"
+	        Info "Kubectl Context: ${KUBE_CURRENT_CONTEXT}"
+	        Info "Kubectl Namespace: ${_KUBECTL_NAMESPACE}"
+            kubectl port-forward \
+                --namespace="${_KUBECTL_NAMESPACE}" \
+                "${_REMOTE_ADDRESS}" "${_LOCAL_PORT}:${_REMOTE_PORT}"
+        else
+            Error "kubectl not in PATH"
+            return 1
+        fi
+    fi
+	set +x
+
+}
+
+# ChooseProfile $PROFILE $CMD_TO_RUN (optional)
+# Description: Switch to a different AWS profile or switch to profile for
+#   for running $CMD only
+# Return: Nothing
+ChooseProfile() {
+
+    zshCompat add
+    local _PROFILE="${1}"
+
+    if [ "${#}" -ge 2 ]; then
+        shift
+        local _CMD_TO_RUN=("${@}")
+    else
+        local _CMD_TO_RUN
+    fi
+
+    local _CRED_FILE="${HOME}/.aws/credentials" \
+        _PROFILES \
+        _PROFILES_ARRAY \
+        PS3
+
+    # Parse _CRED_FILE for profiles
+    # create bash 3.x compat array
+    _PROFILES="$(awk -F'[][]' '/^\[/ { print $2}' "${_CRED_FILE}")"
+    IFS=" " read -r -a _PROFILES_ARRAY <<<"${_PROFILES//$'\n'/ }"
+
+    if [ -f "${_CRED_FILE}" ]; then
+        if [ -n "${_PROFILES}" ]; then
+            if [ -z "${_PROFILE}" ]; then
+                local _PROFILE
+                PS3="$(Info "Type the number of AWS profile: ")"
+                select _PROFILE in "${_PROFILES_ARRAY[@]}"; do
+                    break
+                done
+            else
+                if (! echo "${_PROFILES}" | grep -q "^${_PROFILE}$"); then
+                    Error "${_PROFILE} is not a valid profile"
+                    return 1
+                fi
+            fi
+        else
+            Info "Single profile detected within ${_CRED_FILE}, nothing to do..."
+            return 0
+        fi
+    else
+        Error "AWS credential file not found: ${_CRED_FILE}"
+        return 1
+    fi
+
+    if [ -n "${_CMD_TO_RUN}" ]; then
+        SwitchProfileRunCMD "${_PROFILE}" "${_CMD_TO_RUN[@]}"
+    else
+        Info "Setting AWS profile to: ${_PROFILE}"
+        if [ "${_PROFILE}" = "default" ]; then
+            ExportAWSSTSCredentials "${_PROFILE}"
+        else
+            ExportAWSCredentials "${_PROFILE}"
+        fi
+    fi
+
+    zshCompat del
+
+}
+
+# ECRLogin $USE_TOOLS_ACCOUNT $REGION (optional)
+# Description: Create docker login to ECR so you can use docker to pull images
+#   from ECR repos within a target REGION
+# Return: Nothing
+ECRLogin() {
+
+    local _USE_TOOLS_ACCOUNT="${1:-"true"}" \
+        _REGION="${2:-"us-east-1"}" \
+        _REGIONS=("us-east-1" "us-west-2") \
+        PS3 \
+        _ACCOUNT_ID \
+        _RESULT
+
+    if (! TestCmdInPath "aws"); then
+        Error "aws not in PATH"
+        return 1
+    fi
+
+    if (! TestCmdInPath "docker"); then
+        Error "docker not in PATH"
+        return 1
+    fi
+
+    # NOTE: _REGION takes precedence of AWS_REGION env var
+    # and there is a failback to _REGIONS if _REGION &&
+    # AWS_REGION are null
+    if [ -n "${_REGION}" ]; then
+        _REGIONS=("${_REGION}")
+    elif [ -z "${AWS_REGION}" ]; then
+        if [ -n "${SUPPORTED_AWS_REGIONS}" ]; then
+            _REGIONS=("${SUPPORTED_AWS_REGIONS[@]}")
+        fi
+    else
+        _REGIONS=("${AWS_REGION}")
+    fi
+
+    if [ "${#_REGIONS[@]}" -ge 2 ]; then
+        PS3="$(Info "Type the number of region for ECR login: ")"
+        select _REGION in "${_REGIONS[@]}"; do
+            break
+        done
+    fi
+
+    # Set _ACCOUNT_ID
+    if [[ "${_USE_TOOLS_ACCOUNT}" != "true" ||
+        -z "${TOOLS_ACCOUNT_ID}" ]]; then
+        _ACCOUNT_ID="$(PrintAWSAccount)"
+    else
+        _ACCOUNT_ID="${TOOLS_ACCOUNT_ID}"
+    fi
+
+    if [ -n "${_ACCOUNT_ID}" ]; then
+        if _RESULT="$(aws ecr get-login-password --region "${_REGION}" \
+            &> /dev/stdout | docker login --username AWS --password-stdin \
+            "${_ACCOUNT_ID}.dkr.ecr.${_REGION}.amazonaws.com" \
+            &> /dev/stdout)"; then
+
+            Info "${_RESULT}"
+        else
+            Error "${_RESULT}"
+            Info "Try using pswitch to get new AWS credentials"
+        fi
+    else
+        Error "Could not figure our AWS account ID"
+        return 1
+    fi
+
+}
+
+# InstallAWSIAMAuthenticator $KUBECTL_VERSION $BIN_DIR $UNAME $KUBECTL_URL
+# Description: Install/update aws-iam-authenticator
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallAWSIAMAuthenticator() {
+
+    local _KUBECTL_VERSION="${1}"
+
+    if [ -z "${_KUBECTL_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == KUBECTL_VERSION"
+        return 1
+    fi
+
+    local _BIN_DIR="${2:-"${HOME}/bin"}" \
+        _UNAME="${3:-"darwin"}" \
+        _KUBECTL_URL="${4:-"https://amazon-eks.s3-us-west-2.amazonaws.com"}" \
+
+    local _URL="${_KUBECTL_URL}/${_KUBECTL_VERSION}/bin/${_UNAME}/amd64" \
+        _CHECKSUM_FILE="aws-iam-authenticator.sha256" \
+        _BINARY_NAME="aws-iam-authenticator"
+
+    ChecksumInstallUpdate "${_BIN_DIR}" \
+        "${_BINARY_NAME}" \
+        "${_CHECKSUM_FILE}" \
+        "${_URL}"
+
+    if [ "$?" = "1" ]; then
+        Error "Cheksums don't match for ${_BINARY_NAME}"
+        return 1
+    fi
+
+    local _SRC="${_BIN_DIR}/src/${_BINARY_NAME}"
+
+    if [[ -f "${_SRC}" && "${RUN_INSTALL_TASKS}" = "1" ]]; then
+        cp "${_SRC}" "${_BIN_DIR}"
+        chmod +x "${_BIN_DIR}/${_BINARY_NAME}"
+    fi
+
+}
+
+# InstallAnsibleCollections $PYTHON_VERSION $VENV_NAME $REQ_FILE
+# Description: Install Ansible collections in $REQ_FILE
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallAnsibleCollections() {
+
+    local _PYTHON_VERSION="${1}" \
+        _VENV_NAME="${2}" \
+        _REQ_FILE="${3}"
+
+    if [ -z "${_PYTHON_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == PYTHON_VERSION"
+        return 1
+    fi
+
+    if [ -z "${_VENV_NAME}" ]; then
+        Error "${FUNCNAME[0]} requires \$2 == VENV_NAME"
+        return 1
+    fi
+
+    if [ -z "${_REQ_FILE}" ]; then
+        Error "${FUNCNAME[0]} requires \$3 == REQ_FILE"
+        return 1
+    fi
+
+    # Add pyenv to PATH if it's not in PATH
+    if (TestCmdInPath "pyenv"); then
+        export PYENV_ROOT="${HOME}/.pyenv"
+        export PATH="${PYENV_ROOT}/bin:${PATH}"
+        eval "$(pyenv init -)"
+    fi
+
+    # Init pyenv-virtualenv plugin
+    # NOTE: pyenv-virtualenv is required else return 1
+    if [ -d "${HOME}/.pyenv/plugins/pyenv-virtualenv" ]; then
+        eval "$(pyenv virtualenv-init -)"
+    else
+        Error "pyenv-virtualenv not installed"
+        return 1
+    fi
+
+    # Attempt to activate VENV_NAME
+    export PYENV_VIRTUALENV_DISABLE_PROMPT=1
+    pyenv activate "${_PYTHON_VERSION}/envs/${_VENV_NAME}" &>/dev/null
+    if [ "$?" = "1" ]; then
+        Error "Virtual env ${_PYTHON_VERSION}/envs/${_VENV_NAME} does not exist"
+        return 1
+    fi
+
+    if (TestCmdInPath "ansible-galaxy"); then
+        if [ -f "${_REQ_FILE}" ]; then
+            Info "Installing Ansible collections in:\n\t ${_REQ_FILE}..."
+            ansible-galaxy collection install -r "${_REQ_FILE}"
+            echo ""
+
+        else
+            Error "${_REQ_FILE} does not exist"
+            return 1
+        fi
+    else
+        Error "ansible-galaxy not in PATH"
+        return 1
+    fi
+
+}
+
+# InstallAWSCLIv2 $BIN_DIR
+# Description: Install AWSCLIv2
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallAWSCLIv2() {
+
+    local _BIN_DIR="${1:-"${HOME}/bin"}" \
+        _REQUIRES_UPDATE=0 \
+        _REQUIRES_INSTALL=1
+
+    if [ ! -d "${_BIN_DIR}/src" ]; then
+        mkdir -p "${_BIN_DIR}/src"
+    fi
+
+    if [ -z "${SCRIPT_DIR}" ]; then
+        SCRIPT_DIR="$(GetRealPath "${0}")"
+    fi
+
+    # Download awscliv2 installer
+    if [ -f "${_BIN_DIR}/src/AWSCLIV2.pkg" ]; then
+        cp "${_BIN_DIR}/src/AWSCLIV2.pkg" \
+            "${_BIN_DIR}/src/AWSCLIV2-b4.pkg"
+        _REQUIRES_INSTALL=0
+    fi
+
+    Info "Checking for latest AWSCLIV2..."
+    curl -qk "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o \
+        "${_BIN_DIR}/src/AWSCLIV2.pkg" &>/dev/null
+
+    if [ -f "${_BIN_DIR}/src/AWSCLIV2-b4.pkg" ]; then
+        if (! TestFilesDiffer "${_BIN_DIR}/src/AWSCLIV2.pkg" \
+            "${_BIN_DIR}/src/AWSCLIV2-b4.pkg"); then
+            _REQUIRES_UPDATE=1
+        fi
+    fi
+
+    if [[ "${_REQUIRES_UPDATE}" = "1" || "${_REQUIRES_INSTALL}" = "1" ]]; then
+        # shellcheck source=/dev/null
+        . "${SCRIPT_DIR}/files/awscli-install.xml.template" > \
+            "${_BIN_DIR}/src/awscli-install.xml"
+        installer -pkg "${_BIN_DIR}/src/AWSCLIV2.pkg" \
+            -target CurrentUserHomeDirectory \
+            -applyChoiceChangesXML "${_BIN_DIR}/src/awscli-install.xml"
+        echo ""
+    fi
+
+    # Create symbolic links to aws and aws_completer
+    pushd "${_BIN_DIR}" &>/dev/null || return 1
+    if [ -d "${_BIN_DIR}/aws-cli" ]; then
+        ln -sf "${_BIN_DIR}/aws-cli/aws" aws
+        ln -sf "${_BIN_DIR}/aws-cli/aws_completer" aws_completer
+    fi
+    popd &>/dev/null || return 1
+
+}
+
+# InstallBrew
+# Description: Install brew
+# Return: Nothing
+InstallBrew() {
+
+    if [ -z "${SCRIPT_DIR}" ]; then
+        SCRIPT_DIR="$(GetRealPath "${0}")"
+    fi
+
+    if [[ "${OSTYPE}" =~ darwin* ]]; then
+
+        # Install brew if not installed
+        if (! TestCmdInPath "brew"); then
+            Info "Installing brew, will prompt for password..."
+            /bin/bash -c \
+                "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+        fi
+
+        # Install packages in Brewfile
+        if [ -f "${SCRIPT_DIR}/files/Brewfile" ]; then
+            Info "Installing brew packages within ${SCRIPT_DIR}/Brewfile..."
+            brew bundle \
+                --no-upgrade \
+                --no-lock \
+                --file="${SCRIPT_DIR}/files/Brewfile"
+        fi
+    fi
+
+}
+
+# InstallHelm $HELM_VERSION $BIN_DIR $UNAME $HELM_URL
+# Description: Install/update helm
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallHelm() {
+
+    local _HELM_VERSION="${1}"
+
+    if [ -z "${_HELM_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == HELM_VERSION"
+        return 1
+    fi
+
+    local _BIN_DIR="${2:-"${HOME}/bin"}" \
+        _UNAME="${3:-"darwin"}" \
+        _HELM_URL="${4:-"https://get.helm.sh"}"
+
+    local _CHECKSUM_FILE="helm-v${_HELM_VERSION}-${_UNAME}-amd64.tar.gz.sha256" \
+        _BINARY_NAME="helm-v${_HELM_VERSION}-${_UNAME}-amd64.tar.gz"
+
+    ChecksumInstallUpdate "${_BIN_DIR}" \
+        "${_BINARY_NAME}" \
+        "${_CHECKSUM_FILE}" \
+        "${_HELM_URL}"
+
+    if [ "$?" = "1" ]; then
+        Error "Cheksums don't match for helm"
+        return 1
+    fi
+
+    local _SRC="${_BIN_DIR}/src/helm-v${_HELM_VERSION}-${_UNAME}-amd64.tar.gz"
+
+    if [[ -f "${_SRC}" && "${RUN_INSTALL_TASKS}" = "1" ]]; then
+        tar -xf "${_SRC}" \
+            -C "${_BIN_DIR}/" --strip 1 "${_UNAME}-amd64/helm"
+        chmod +x "${_BIN_DIR}/helm"
+    fi
+
+    # Install completion libs for helm
+    if [ -f "${_BIN_DIR}/helm" ]; then
+        if [ ! -d "${_BIN_DIR}/files" ]; then
+            mkdir -p "${_BIN_DIR}/files"
+        fi
+        Info "Installing helm completions libs..."
+        "${_BIN_DIR}"/helm completion bash \
+            >"${_BIN_DIR}"/files/helm-completion.bash
+        "${_BIN_DIR}"/helm completion zsh \
+            >"${_BIN_DIR}"/files/helm-completion.zsh
+    fi
+
+}
+
+# InstallKubectl $KUBECTL_VERSION $BIN_DIR $UNAME $KUBECTL_URL
+# Description: Install/update kubectl
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallKubectl() {
+
+    local _KUBECTL_VERSION="${1}"
+
+    if [ -z "${_KUBECTL_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == KUBECTL_VERSION"
+        return 1
+    fi
+
+    local _BIN_DIR="${2:-"${HOME}/bin"}" \
+        _UNAME="${3:-"darwin"}" \
+        _KUBECTL_URL="${4:-"https://amazon-eks.s3-us-west-2.amazonaws.com"}" \
+
+    local _URL="${_KUBECTL_URL}/${_KUBECTL_VERSION}/bin/${_UNAME}/amd64" \
+        _CHECKSUM_FILE="kubectl.sha256" \
+        _BINARY_NAME="kubectl"
+
+    ChecksumInstallUpdate "${_BIN_DIR}" \
+        "${_BINARY_NAME}" \
+        "${_CHECKSUM_FILE}" \
+        "${_URL}"
+
+    if [ "$?" = "1" ]; then
+        Error "Cheksums don't match for ${_BINARY_NAME}"
+        return 1
+    fi
+
+    local _SRC="${_BIN_DIR}/src/${_BINARY_NAME}"
+
+    if [[ -f "${_SRC}" && "${RUN_INSTALL_TASKS}" = "1" ]]; then
+        cp "${_SRC}" "${_BIN_DIR}"
+        chmod +x "${_BIN_DIR}/${_BINARY_NAME}"
+    fi
+
+    # Install completion libs for kubectl
+    if [ -f "${_BIN_DIR}/kubectl" ]; then
+        if [ ! -d "${_BIN_DIR}/files" ]; then
+            mkdir -p "${_BIN_DIR}/files"
+        fi
+        Info "Installing kubectl completions libs..."
+        "${_BIN_DIR}"/kubectl completion bash \
+            >"${_BIN_DIR}"/files/kubectl-completion.bash
+        "${_BIN_DIR}"/kubectl completion zsh \
+            >"${_BIN_DIR}"/files/kubectl-completion.zsh
+    fi
+
+    # Secure ${HOME}/.kube if it exists
+    if [ -d "${HOME}/.kube" ]; then
+        chmod 700 "${HOME}/.kube"
+        if [ -f "${HOME}/.kube/config" ]; then
+            chmod 600 "${HOME}/.kube/config"
+        fi
+    fi
+
+}
+
+# InstallKrew $KREW_VERSION $BIN_DIR $UNAME $KREW_URL $KREW_PLUGIN_FILE_PATH
+# Description: Install/update krew
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallKrew() {
+
+    if [ -z "${SCRIPT_DIR}" ]; then
+        SCRIPT_DIR="$(GetRealPath "${0}")"
+    fi
+
+    local _KREW_VERSION="${1}"
+
+    if [ -z "${_KREW_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == KREW_VERSION"
+        return 1
+    fi
+
+    local _BIN_DIR="${2:-"${HOME}/bin"}" \
+        _UNAME="${3:-"darwin"}" \
+        _KREW_URL="${4:-"https://github.com/kubernetes-sigs/krew/releases/download"}" \
+        _KREW_PLUGIN_FILE_PATH="${5:-"${_SCRIPT_DIR}/files/krew_plugin_file.txt"}" \
+        _CHECKSUM_FILE="krew.tar.gz.sha256" \
+        _BINARY_NAME="krew.tar.gz" \
+
+    local _URL="${_KREW_URL}/v${_KREW_VERSION}"
+
+    ChecksumInstallUpdate "${_BIN_DIR}" \
+        "${_BINARY_NAME}" \
+        "${_CHECKSUM_FILE}" \
+        "${_URL}"
+
+    if [ "$?" = "1" ]; then
+        Error "Cheksums don't match for ${_BINARY_NAME}"
+        return 1
+    fi
+
+    local _SRC="${_BIN_DIR}/src/${_BINARY_NAME}"
+
+    if [[ -f "${_SRC}" && "${RUN_INSTALL_TASKS}" = "1" ]]; then
+        tar -xf "${_BIN_DIR}/src/${_BINARY_NAME}" \
+            -C "${_BIN_DIR}" --strip 1 --exclude LICENSE
+        "${_BIN_DIR}/krew-${_UNAME}_amd64" install krew &>/dev/null
+        rm -rf "${_BIN_DIR}/krew-*"
+    fi
+
+    if [ -f "${_KREW_PLUGIN_FILE_PATH}" ]; then
+        if [ -f "${_BIN_DIR}/kubectl" ]; then
+            export PATH="${_BIN_DIR}:${HOME}/.krew/bin:${PATH}"
+            Info "Installing krew plugins in:\n\t ${_KREW_PLUGIN_FILE_PATH}..."
+            kubectl krew install <"${_KREW_PLUGIN_FILE_PATH}"
+            echo ""
+        fi
+    fi
+
+}
+
+# InstallPacker $PACKER_VERSION $BIN_DIR $UNAME $PACKER_URL
+# Description: Install/update packer
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallPacker() {
+
+    local _PACKER_VERSION="${1}"
+
+    if [ -z "${_PACKER_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == PACKER_VERSION"
+        return 1
+    fi
+
+    local _BIN_DIR="${2:-"${HOME}/bin"}" \
+        _UNAME="${3:-"darwin"}" \
+        _PACKER_URL="${4:-"https://releases.hashicorp.com/packer"}" \
+        _CHECKSUMS_FILE="packer_${_PACKER_VERSION}_SHA256SUMS" \
+
+    local _BINARY_NAME="packer_${_PACKER_VERSION}_${_UNAME}_amd64.zip" \
+        _URL="${_PACKER_URL}/${_PACKER_VERSION}" \
+        _CHECKSUM_FILE="packer_SHA256SUM"
+
+    # Create packer_SHA256SUM based on ${_UNAME}
+    curl -L -o "${_BIN_DIR}/src/${_CHECKSUMS_FILE}" \
+        "${_URL}/${_CHECKSUMS_FILE}" &>/dev/null
+    if [ -f "${_BIN_DIR}/src/${_CHECKSUMS_FILE}" ]; then
+        awk "/${_UNAME}_amd64/ {printf}" \
+            "${_BIN_DIR}/src/${_CHECKSUMS_FILE}" \
+            >"${_BIN_DIR}/src/${_CHECKSUM_FILE}"
+    else
+        Error "Failed downloading ${_CHECKSUMS_FILE}"
+        return 1
+    fi
+
+    ChecksumInstallUpdate "${_BIN_DIR}" \
+        "${_BINARY_NAME}" \
+        "${_CHECKSUM_FILE}" \
+        "${_URL}"
+
+    if [ "$?" = "1" ]; then
+        Error "Cheksums don't match for packer"
+        return 1
+    fi
+
+    local _SRC="${_BIN_DIR}/src/${_BINARY_NAME}"
+
+    if [[ -f "${_SRC}" && "${RUN_INSTALL_TASKS}" = "1" ]]; then
+        unzip -o "${_SRC}" \
+            -d "${_BIN_DIR}/"
+        chmod +x "${_BIN_DIR}/packer"
+        echo ""
+    fi
+}
+
+# InstallPyenv
+# Description: Install pyenv python version manager
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallPyenv() {
+
+    # Install pyenv if not installed,
+    # or update if installed
+    if [ ! -d "${HOME}/.pyenv" ]; then
+        Info "\nInstalling pyenv..."
+        git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
+        echo ""
+    else
+        Info "\nChecking for pyenv updates..."
+        pushd "${HOME}/.pyenv" &>/dev/null || return 1
+        git pull --ff-only
+        echo ""
+        popd &>/dev/null || return 1
+    fi
+
+    # Add pyenv to PATH if it's not in PATH
+    if (! TestCmdInPath "pyenv"); then
+        export PYENV_ROOT="${HOME}/.pyenv"
+        export PATH="${PYENV_ROOT}/bin:${PATH}"
+        eval "$(pyenv init -)"
+    fi
+
+    # Install pyenv-virtualenv if not installed,
+    # or update if installed
+    if [ ! -d "${HOME}/.pyenv/plugins/pyenv-virtualenv" ]; then
+        Info "Installing pyenv-virtualenv plugin for pyenv..."
+        git clone https://github.com/pyenv/pyenv-virtualenv.git \
+            "${HOME}/.pyenv/plugins/pyenv-virtualenv"
+        echo ""
+    else
+        Info "Checking pyenv-virtualenv for updates..."
+        pushd "${HOME}/.pyenv/plugins/pyenv-virtualenv" &>/dev/null || return 1
+        git pull --ff-only
+        echo ""
+        popd &>/dev/null || return 1
+    fi
+
+}
+
+# InstallPythonCreateVenv $PYTHON_VERSION $VENV_NAME $REQ_FILE
+# Description: Installs PYTHON_VERSION, creates venv, and installs all
+#   packages within REQ_FILE
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallPythonCreateVenv() {
+
+    local _PYTHON_VERSION="${1}" \
+        _VENV_NAME="${2}" \
+        _REQ_FILE="${3}"
+
+    if [ -z "${_PYTHON_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == PYTHON_VERSION"
+        return 1
+    fi
+
+    if [ -z "${_VENV_NAME}" ]; then
+        Error "${FUNCNAME[0]} requires \$2 == VENV_NAME"
+        return 1
+    fi
+
+    if [ -z "${_REQ_FILE}" ]; then
+        Error "${FUNCNAME[0]} requires \$3 == REQ_FILE"
+        return 1
+    fi
+
+    if [ -z "${SCRIPT_DIR}" ]; then
+        SCRIPT_DIR="$(GetRealPath "${0}")"
+    fi
+
+    InstallPython "${_PYTHON_VERSION}"
+    CreateVirtualenv "${_PYTHON_VERSION}" "${_VENV_NAME}"
+    InstallRequirements "${_PYTHON_VERSION}" "${_VENV_NAME}" "${_REQ_FILE}"
+
+}
+
+# InstallTerraform $TERRAFORM_VERSION $BIN_DIR $UNAME $TERRAFORM_URL
+# Description: Install/update terraform
+# Return: 1 == FAIL, 0 == SUCCESS
+InstallTerraform() {
+
+    local _TERRAFORM_VERSION="${1}"
+
+    if [ -z "${_TERRAFORM_VERSION}" ]; then
+        Error "${FUNCNAME[0]} requires \$1 == TERRAFORM_VERSION"
+        return 1
+    fi
+
+    local _BIN_DIR="${2:-"${HOME}/bin"}" \
+        _UNAME="${3:-"darwin"}" \
+        _TERRAFORM_URL="${4:-"https://releases.hashicorp.com/terraform"}" \
+        _CHECKSUMS_FILE="terraform_${_TERRAFORM_VERSION}_SHA256SUMS" \
+
+    local _BINARY_NAME="terraform_${_TERRAFORM_VERSION}_${_UNAME}_amd64.zip" \
+        _URL="${_TERRAFORM_URL}/${_TERRAFORM_VERSION}" \
+        _CHECKSUM_FILE="terraform_SHA256SUM"
+
+    # Create terraform_SHA256SUM based on ${_UNAME}
+    curl -L -o "${_BIN_DIR}/src/${_CHECKSUMS_FILE}" \
+        "${_URL}/${_CHECKSUMS_FILE}" &>/dev/null
+    if [ -f "${_BIN_DIR}/src/${_CHECKSUMS_FILE}" ]; then
+        awk "/${_UNAME}_amd64/ {printf}" \
+            "${_BIN_DIR}/src/${_CHECKSUMS_FILE}" \
+            >"${_BIN_DIR}/src/${_CHECKSUM_FILE}"
+    else
+        Error "Failed downloading ${_CHECKSUMS_FILE}"
+        return 1
+    fi
+
+    ChecksumInstallUpdate "${_BIN_DIR}" \
+        "${_BINARY_NAME}" \
+        "${_CHECKSUM_FILE}" \
+        "${_URL}"
+
+    if [ "$?" = "1" ]; then
+        Error "Cheksums don't match for terraform"
+        return 1
+    fi
+
+    local _SRC="${_BIN_DIR}/src/${_BINARY_NAME}"
+
+    if [[ -f "${_SRC}" && "${RUN_INSTALL_TASKS}" = "1" ]]; then
+        unzip -o "${_SRC}" \
+            -d "${_BIN_DIR}/"
+        chmod +x "${_BIN_DIR}/terraform"
+        echo ""
+    fi
+
+}
+
+# InstallXcodeCMDTools
+# Description: Install Xcode commandline tools
+# Return: Nothing
+InstallXcodeCMDTools() {
+
+    if [[ "${OSTYPE}" =~ darwin* ]]; then
+        if (! xcode-select -p &>/dev/null); then
+            Info "Installing Xcode commandline tools..."
+            xcode-select --install
+        fi
+    fi
+
+}
+
+# InstallYoPass
+# Description: Download yopass source and compile it
+# Return: Nothing
+InstallYoPass() {
+
+local _BIN_DIR="${1:-"${HOME}/bin"}"
+local _SRC_DIR="${2:-"${_BIN_DIR}/src"}"
+
+if (TestCmdInPath "go"); then
+
+(
+
+    Info "\nInstalling yopass..."
+    export GOPATH="${_SRC_DIR}/go"
+    export GO111MODULE=on
+    go get github.com/jhaals/yopass/cmd/yopass
+    pushd "${_SRC_DIR}/go/pkg/mod/github.com/jhaals" &> /dev/null || return 1
+    # shellcheck disable=SC2012
+    pushd "$(\ls -1dt ./*/ | head -n 1)/cmd/yopass" &> /dev/null || return 1
+    go build -o "${_BIN_DIR}/yopass"
+    popd &> /dev/null || return 1
+    popd &> /dev/null || return 1
+    echo ""
+
+    if [ ! -f "${_BIN_DIR}/yopass" ]; then
+        Error "Failed to xompile/install yopass"
+        return 1
+    fi
+)
+
+else
+    Error "go is not installed can't compile yopass"
+    return 1
+fi
+
+}
+
+# SetupCMXRCAutoSource $DESTINATION $BASHRC $ZSHRC
+# Description: Setup Zsh completions installed via brew on Mac
+# Return: Nothing
+SetupCMXRCAutoSource() {
+
+    local _DESTINATION="${1:-"${HOME}/bin/files"}" \
+        _BASHRC="${2}" \
+        _ZSHRC="${3}"
+
+    if [ -z "${_BASHRC}" ]; then
+        Error "${FUNCNAME[0]} requires \$2 == BASHRC"
+        return 1
+    fi
+
+    if [ -z "${_ZSHRC}" ]; then
+        Error "${FUNCNAME[0]} requires \$3 == BASHRC"
+        return 1
+    fi
+
+    if [ -z "${SCRIPT_DIR}" ]; then
+        SCRIPT_DIR="$(GetRealPath "${0}")"
+    fi
+
+    if [ ! -d "${_DESTINATION}" ]; then
+        Info "Creating ${_DESTINATION}..."
+        mkdir -p "${_DESTINATION}"
+    fi
+
+    if [[ -f "${SCRIPT_DIR}/files/cmx.bashrc" && -f \
+        "${SCRIPT_DIR}/files/bash-functions" ]]; then
+        Info "Installing cmx.bashrc and bash-functions to ${_DESTINATION}..."
+        cp "${SCRIPT_DIR}/files/cmx.bashrc" \
+            "${_DESTINATION}/"
+        cp "${SCRIPT_DIR}/files/bash-functions" \
+            "${_DESTINATION}/"
+
+        if [ ! -f "${_BASHRC}" ]; then
+            touch "${_BASHRC}"
+        fi
+        if (! grep -q "^. ${_DESTINATION}/cmx.bashrc" "${_BASHRC}"); then
+            Info "Adding auto-source of cmx.bashrc to ${_BASHRC}..."
+            echo -e "\n# Auto source of CMX aliases/functions" >>"${_BASHRC}"
+            echo -e ". ${_DESTINATION}/cmx.bashrc\n" >>"${_BASHRC}"
+        fi
+
+        if [ ! -f "${_ZSHRC}" ]; then
+            touch "${_ZSHRC}"
+        fi
+        if (! grep -q "^. ${_DESTINATION}/cmx.bashrc" "${_ZSHRC}"); then
+            Info "Adding auto-source of cmx.bashrc to ${_ZSHRC}..."
+            echo -e "\n# Auto source of CMX aliases/functions" >>"${_ZSHRC}"
+            echo -e ". ${_DESTINATION}/cmx.bashrc\n" >>"${_ZSHRC}"
+        fi
+
+    else
+        Error "Could not find ${SCRIPT_DIR}/files/cmx.bashrc"
+        return 1
+    fi
+
+}
+
+# SetupZshCompletions
+# Description: Setup Zsh completions installed via brew on Mac
+# Return: Nothing
+SetupZshCompletions() {
+
+    if [[ "${OSTYPE}" =~ darwin* ]]; then
+        if (TestCmdInPath "zsh" && TestCmdInPath "brew"); then
+            Info "Setting up ZSH completions..."
+            # shellcheck source=/dev/null
+            zsh -lc 'FPATH="$(brew --prefix)/share/zsh-completions:${FPATH}";
+                autoload -Uz compinit; rm -rf ~/.zcompdump; compinit -i'
+        fi
+    fi
+
+}
+
+#--------------------------------------------------------------------------
+# Kubernetes Functions: functions that interact with Kubernetes
+#--------------------------------------------------------------------------
+
+# KubeChooseCluster $ENV
+# Description: Choose Kubernetes cluster to connect too
+# Return: Nothing
+KubeChooseCluster() {
+
+    zshCompat add
+
+    if (! TestCmdInPath "kubectl"); then
+        Error "kubectl not in PATH"
+        return 1
+    fi
+
+    if (! TestCmdInPath "aws"); then
+        Error "aws not in PATH"
+        return 1
+    fi
+
+    local _ENV="${1:-""}" \
+        _REGIONS=("us-east-1" "us-west-2") \
+        _REGION \
+        _EKS_CLUSTERS=() \
+        _REGION_CLUSTERS=() \
+        _NON_EKS_CLUSTERS=() \
+        _C \
+        _CLUSTERS=() \
+        _CLUSTER \
+        _TMP_CLUSTER \
+        PS3
+
+    if [ -z "${AWS_REGION}" ]; then
+        if [ -n "${SUPPORTED_AWS_REGIONS}" ]; then
+            _REGIONS=("${SUPPORTED_AWS_REGIONS[@]}")
+        fi
+    else
+        _REGIONS=("${AWS_REGION}")
+    fi
+
+    # Compile array of all eks clusters for
+    # all _REGIONS
+    for _REGION in "${_REGIONS[@]}"; do
+        _REGION_CLUSTERS=("$(aws eks --region "${_REGION}" \
+            list-clusters --query "clusters[*]" \
+            --output text \
+            --no-paginate | \
+            sort -u)")
+        if [ -z "${_REGION_CLUSTERS[*]}" ]; then
+            continue
+        fi
+        if [ "${#_EKS_CLUSTERS[@]}" = "0" ]; then
+            _EKS_CLUSTERS=("${_REGION_CLUSTERS[@]/%/:${_REGION}}")
+        else
+            _EKS_CLUSTERS=("${_EKS_CLUSTERS[@]}" "${_REGION_CLUSTERS[@]/%/:${_REGION}}")
+        fi
+    done
+
+    # Compile a array of non-eks clusters
+    _NON_EKS_CLUSTERS=("$(kubectl config get-contexts --no-headers | \
+        awk '!/eks/ && !/\*/ {printf "%s ", $1}')")
+
+    # Create final CLUSTERS array
+    if [ "${#_NON_EKS_CLUSTERS}" = "0" ]; then
+        _CLUSTERS=("${_EKS_CLUSTERS[@]}")
+    else
+        _CLUSTERS=("${_EKS_CLUSTERS[@]}" "${_NON_EKS_CLUSTERS[@]}")
+    fi
+
+    # If _ENV is defined there is no need to prompt user
+    # for slection of cluster
+    if [ -n "${_ENV}" ]; then
+        for _C in "${_CLUSTERS[@]}"; do
+            if [[ "${_C}" =~ -${_ENV}- ]]; then
+                _CLUSTER="${_C}"
+                break
+            fi
+        done
+    elif [ "${#_CLUSTERS[@]}" -ge 2 ]; then
+        PS3="$(Info "Type the number of cluster to connect to: ")"
+        select _TMP_CLUSTER in "${_CLUSTERS[@]/:*/}"; do
+            break
+        done
+        # Find  _TMP_CLUSTER:REGION in _CLUSTERS
+        # NOTE: The below was the most portable method
+        # as options for grep differ between Linux/Darwin
+        for _C in "${_CLUSTERS[@]}"; do
+            if [ "${_C%:*}" = "${_TMP_CLUSTER}" ]; then
+                _CLUSTER="${_C}"
+                break
+            fi
+        done
+    else
+        _CLUSTER="${_CLUSTERS[*]}"
+    fi
+
+    if [ -z "${_CLUSTER}" ]; then
+        Error "Could not find a Kubernetes cluster"
+        return 1
+    fi
+
+    if [[ "${_CLUSTER}" =~ eks ]]; then
+        aws eks --region "${_CLUSTER#*:}" \
+            update-kubeconfig --name "${_CLUSTER%:*}"
+    else
+        KubeSetContext "${_CLUSTER}"
+    fi
+
+    kubectl get svc &> /dev/null
+    KubeCurrentCluster
+
+    if [ "${_CLUSTER%:*}" != "${KUBE_CURRENT_CLUSTER}" ]; then
+        Error "ERROR : Could not switch to: ${_CLUSTER%:*}"
+        return 1
+    fi
+
+    zshCompat del
+
+}
+
+# KubeCurrentCluster
+# Description: Return name of current EKS cluster
+# Return: KUBE_CURRENT_CLUSTER
+KubeCurrentCluster() {
+
+    if (! TestCmdInPath "kubectl"); then
+        Error "kubectl not in PATH"
+        return 1
+    fi
+
+    local _CURRENT_CLUSTER
+    _CURRENT_CLUSTER="$(kubectl config current-context |
+        awk -F'/' '{print $NF}')"
+    if [ -z "${_CURRENT_CLUSTER}" ]; then
+        export KUBE_CURRENT_CLUSTER="unknown"
+    else
+        export KUBE_CURRENT_CLUSTER="${_CURRENT_CLUSTER}"
+    fi
+
+}
+
+# GetCurrentContext
+# Description: Return name of current K8 context
+# Return: KUBE_CURRENT_CONTEXT
+KubeCurrentContext() {
+
+    if (! TestCmdInPath "kubectl"); then
+        Error "kubectl not in PATH"
+        return 1
+    fi
+
+    local _CURRENT_CONTEXT
+    _CURRENT_CONTEXT="$(kubectl config current-context)"
+
+    if [ -z "${_CURRENT_CONTEXT}" ]; then
+        export KUBE_CURRENT_CONTEXT="unknown"
+    else
+        export KUBE_CURRENT_CONTEXT="${_CURRENT_CONTEXT}"
+    fi
+
+}
+
+# SetContext $CONTEXT
+# Description: Set K8 context to $CONTEXT
+# Return: Nothing
+KubeSetContext() {
+
+    if [ -n "${1}" ]; then
+        local _CONTEXT="${1}"
+    else
+        Error "${FUNCNAME[0]} requires \$1 == CONTEXT"
+        return 1
+    fi
+
+    if (! TestCmdInPath "kubectl"); then
+        Error "kubectl not in PATH"
+        return 1
+    else
+        if (kubectl config get-contexts | grep -q "${_CONTEXT}"); then
+            # NOTE: set-context does not actually set the context
+            kubectl config use-context "${_CONTEXT}"
+        else
+            Error "Context ${_CONTEXT} does not exist"
+            return 1
+        fi
+    fi
+
+}

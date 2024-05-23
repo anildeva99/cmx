@@ -1,0 +1,83 @@
+def currentBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME;
+def formatAWSCodeBuildEnvVariables(envVariables = [:]) {
+    def result = "";
+    if (envVariables.size() == 0) {
+        return result;
+    }
+
+    envVariables.each { key, value ->
+        if (result != "") {
+            result += ",";
+        }
+        result += "{" + key + "," + value + "}";
+    }
+
+    return "[" + result + "]";
+}
+// def gitVariableMap;
+
+pipeline {
+  agent any
+  options { skipDefaultCheckout() }
+  parameters {
+    choice(name: 'DEPLOY_ENV', choices: ['development', 'onboarding'], description: 'The target environment.')
+    string(name: 'DEPLOY_SVC', defaultValue: '*', description: 'The service to deploy (or * for all).')
+  }
+
+  stages {
+    stage('Preparation') {
+      steps {
+        script {
+          echo 'Prepare Phase'
+
+          // Get code from GitHub repository
+          gitVariableMap = checkout scm
+        }
+      }
+    }
+
+    stage('Deploy') {
+      steps {
+        script {
+          echo 'Deploy Phase'
+
+          def codeBuildEnvVariables = [:]
+          codeBuildEnvVariables.put("DEPLOY_ENV", "${params.DEPLOY_ENV}");
+          codeBuildEnvVariables.put("ANSIBLE_PLAYBOOK_DIR", "ansible/application-environment");
+          codeBuildEnvVariables.put("ANSIBLE_PLAYBOOK_PARAMS", "-e env=${params.DEPLOY_ENV} -e deploy_service=${params.DEPLOY_SVC} undo-deploy-application-services.yml deploy-application-services.yml");
+
+          // Run the maven build
+          withAWS(region: 'us-east-1', credentials: 'AwsCodeBuild') {
+              awsIdentity()
+
+              codeBuildEnvVariables.put("AWS_DEFAULT_REGION", env.AWS_DEFAULT_REGION);
+
+              awsCodeBuild projectName: "ansible-execute-eks-playbook",
+                      credentialsType: 'keys',
+                      buildSpecFile: 'codebuild/ansible-execute-eks-playbook.yml',
+                      awsAccessKey: env.AWS_ACCESS_KEY_ID,
+                      awsSecretKey: env.AWS_SECRET_ACCESS_KEY,
+                      sourceControlType: 'project',
+                      sourceVersion: gitVariableMap.GIT_BRANCH,
+                      region: 'us-east-1',
+                      envVariables: formatAWSCodeBuildEnvVariables(codeBuildEnvVariables)
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    changed {
+      script {
+        def buildResult = currentBuild.currentResult
+
+        if (buildResult == "FAILURE") {
+            slackSend color: "danger", message: "Job: ${env.JOB_NAME}, build number ${env.BUILD_NUMBER}, commit ${env.GIT_COMMIT} is broken! ${env.JOB_URL}"
+        } else if (buildResult == "UNSTABLE") {
+            slackSend color: "warning", message: "Job: ${env.JOB_NAME}, build number ${env.BUILD_NUMBER}, commit ${env.GIT_COMMIT} is unstable! ${env.JOB_URL}"
+        }
+      }
+    }
+  }
+}

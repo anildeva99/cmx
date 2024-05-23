@@ -1,0 +1,69 @@
+A01 = Admit
+
+A01ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a01_import_url_path }}
+
+A02 = Transfer
+
+A02ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a02_import_url_path }}
+
+A03 = Discharge
+
+A03ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a03_import_url_path }}
+
+A04 = Register
+
+A04ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a04_import_url_path }}
+
+A06 = OutInTransfer
+
+A05ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a05_import_url_path }}
+
+A06ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a06_import_url_path }}
+
+A07 = InOutTransfer
+
+A07ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a07_import_url_path }}
+
+A08 = Update
+
+A08ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_adt_a08_import_url_path }}
+
+A11 = CancelAdmit
+
+A12 = CancelTranfer
+
+A13 = CancelDischarge
+
+A17 = Swap
+
+batchSize = 100
+
+maxErrorRetryCount = 10
+
+cptCodeUrl =  http://dictionary-service.codametrix:{{ service_ports.cmx_dictionary_service }}/{{ cpt_dictionary_list_url_path }}
+
+modifierUrl =  http://dictionary-service.codametrix:{{ service_ports.cmx_dictionary_service }}/{{ modifier_dictionary_list_url_path }}
+
+codemapUrl =  http://dictionary-service.codametrix:{{ service_ports.cmx_dictionary_service }}/{{ codemap_dictionary_list_url_path }}
+
+dictionaryUrl = http://dictionary-service.codametrix:{{ service_ports.cmx_dictionary_service }}/{{ dictionary_v1_url_path }}
+
+loginUrl = http://user-service.codametrix:{{ service_ports.cmx_user_service }}/{{ security_check_url_path }}
+
+importUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ file_import_url_path }}
+
+ORUR01ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_oru_r01_import_url_path }}
+
+ORMO01ImportUrl = http://importer-service.codametrix:{{ service_ports.cmx_importer_service }}/{{ hl7_orm_o01_import_url_path }}
+
+documentUrl = http://documentation-service.codametrix:{{ service_ports.cmx_documentation_service }}/{{ document_import_url_path }}
+
+namespaceId = CMX
+
+serviceVersion = v1
+
+batchSize = 100
+
+processingId = {{ mirth_processing_indicator }}
+
+loginRetryCount = 3

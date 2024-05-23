@@ -1,0 +1,278 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: case-builder-service
+  labels:
+    app: case-builder-service
+spec:
+  selector:
+    app: case-builder-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_case_builder_service }}
+    targetPort: {{ container_ports.cmx_case_builder_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+{% if enable_java_profiler %}
+  - protocol: TCP
+    name: tcp-jmx
+    port: {{ cmx_java_service_jmx_port_number}}
+    targetPort: {{ cmx_java_service_jmx_port_number }}
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-builder-service
+  labels:
+    app: case-builder-service
+    version: {{ image_versions.cmx_case_builder_service }}
+spec:
+  replicas: {{ (kubernetes_hpa.case_builder_service.min_pods is defined) | ternary( kubernetes_hpa.case_builder_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: case-builder-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: case-builder-service
+        version: "{{ image_versions.cmx_case_builder_service }}"
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.caseservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-case-builder-service:{{ image_versions.cmx_case_builder_service }}
+        imagePullPolicy: {{ cmx_case_builder_service_image_pull_policy }}
+        name: case-builder-service
+        resources:
+          limits:
+            memory: {{ case_builder_service_max_container_memory }}
+            cpu: {{ case_builder_service_max_cpus }}
+          requests:
+            memory: {{ case_builder_service_min_container_memory }}
+            cpu: {{ case_builder_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000 -jar /opt/tools/case-builder-service/case-builder-service-{{ image_versions.cmx_case_builder_service  }}.jar"]
+{% elif enable_java_profiler %}
+        command: ["java"]
+        args: ["-agentpath:/opt/util/honest-profiler/liblagent.so=interval=1,logPath=/tmp/profiler_log.hpl", "-classpath /opt/util/honest-profiler/honest-profiler.jar", "-Dcom.sun.management.jmxremote.port={{ cmx_java_service_jmx_port_number }}", "-Dcom.sun.management.jmxremote.authenticate=false", "-jar", "-Xms{{ case_builder_service_min_heap_size }}", "-Xmx{{ case_builder_service_max_heap_size }}",n "/opt/tools/case-builder-service/case-builder-service-{{ image_versions.cmx_case_builder_service  }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ case_builder_service_min_heap_size }}", "-Xmx{{ case_builder_service_max_heap_size }}", "/opt/tools/case-builder-service/case-builder-service-{{ image_versions.cmx_case_builder_service  }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_case_builder_service }}
+            name: http
+            protocol: TCP
+
+{% if enable_java_profiler %}
+
+          - containerPort: {{ cmx_java_service_jmx_port_number }}
+            name: jmx
+            protocol: TCP
+
+{% endif %}
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_case_builder_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_case_builder_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_case_builder_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: CASE_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: caseservice-database
+                key: dburl
+          - name: CASE_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: caseservice-database
+                key: dbusername
+          - name: CASE_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: caseservice-database
+                key: dbpassword
+          - name: CASE_SERVICE_DB_INITIAL_SIZE
+            value: "{{ case_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: CASE_SERVICE_DB_MAX_WAIT
+            value: "{{ case_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: CASE_SERVICE_DB_MAX_ACTIVE
+            value: "{{ case_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: CASE_SERVICE_DB_MAX_IDLE
+            value: "{{ case_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: CASE_SERVICE_DB_MIN_IDLE
+            value: "{{ case_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+          - name: CASE_JSON_AWS_S3_BUCKET
+            value: {{ process_data_bucket }}
+          - name: CASE_JSON_AWS_S3_BUCKET_ROOT_PATH
+            value: {{ process_data_bucket_root }}
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: AWS_SQS_ENDPOINT
+            value: "https://sqs.{{ region }}.amazonaws.com"
+          - name: AWS_SQS_CASE_BUILDER_QUEUE
+            value: "{{ sqs_queues.casebuilder_queue.queue_name }}"
+          - name: AWS_SQS_CASE_EVENTS_QUEUE
+            value: "{{ sqs_queues.caseevents_queue.queue_name }}"
+          - name: AWS_SQS_CHARGE_PROCESSOR_QUEUE
+            value: "{{ sqs_queues.charge_processor_queue.queue_name }}"
+          - name: LIQUIBASE_CASEBUILDER_CONTEXTS
+            value: "{{ liquibase_casebuilder_contexts }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+          - name: MU_PREDICTION_FUNCTION
+            value: "{{ mu_sagemaker_settings.mu_prediction_function }}"
+          - name: MU_PREDICTION_VERSION
+            value: "{{ mu_sagemaker_settings.mu_prediction_version }}"
+          - name: MU_ALGORITHM
+            value: "{{ mu_sagemaker_settings.mu_algorithm }}"
+          - name: MU_ENVIRONMENT
+            value: "{{ env }}"
+          - name: MU_PROVENANCE
+            value: "{{ mu_sagemaker_settings.mu_provenance }}"
+          - name: VITALWARE_ENABLED
+            value: "{{ vitalware_enabled }}"
+
+{% if vitalware_enabled %}
+          - name: VITALWARE_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: vitalware-api
+                key: username
+          - name: VITALWARE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: vitalware-api
+                key: password
+          - name: VITALWARE_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: vitalware-api
+                key: api_key
+{% endif %}
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: case-builder-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: case-builder-service
+  minReplicas: {{ (kubernetes_hpa.case_builder_service.min_pods is defined) | ternary( kubernetes_hpa.case_builder_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.case_builder_service.max_pods is defined) | ternary( kubernetes_hpa.case_builder_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

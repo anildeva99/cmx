@@ -1,0 +1,159 @@
+---
+- name: Terraform block
+  block:
+    - name: "Set application environment state to {{ state }}"
+      community.general.terraform:
+        force_init: "{{ force_init }}"
+        project_path: "{{ terraform_path }}"
+        state: "{{ state }}"
+        variables_file: terraform.tfvars
+      register: environment_terraform
+  rescue:
+    - name: Terraform failed with the following error(s)
+      fail:
+        msg: "{{ environment_terraform.msg.split('\n') }}"
+
+# NOTE: Now we rotate the DB and Redshift master passwords
+#   and JWT key as they are set by terraform so whatever password
+#   is used there will be stored in terraform state.
+#   The only "master" password we can't rotate is Elasticache.
+
+- name: Gather facts about the application database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ application_database_identifier }}"
+    region: "{{ region }}"
+  register: app_db_facts
+
+- name: Gather facts about the Redshift cluster
+  community.aws.redshift_info:
+    cluster_identifier: "{{ application_data_warehouse_identifier }}"
+    region: "{{ region }}"
+  register: redshift_cluster_facts
+
+- name: Gather facts about the Application Mirth database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ mirth_database_identifier }}"
+    region: "{{ region }}"
+  register: application_mirth_database_facts
+
+- name: Gather facts about the Ingress Mirth database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ ingress_mirth_database_identifier }}"
+    region: "{{ region }}"
+  register: ingress_mirth_database_facts
+
+- name: Pause for 3 minutes to allow DB/Redshift modify operations to finish
+  pause:
+    minutes: 3
+  when: (environment_terraform.changed)
+
+- name: Generate passwords to use for rotation.
+  set_fact:
+    db_master_password: "{{ lookup('randpass', '32', uppercase=10,
+      lowercase=10, digits=10) }}"
+    ingress_mirthdb_master_password: "{{ lookup('randpass', '32', uppercase=10,
+      lowercase=10, digits=10) }}"
+    mirthdb_master_password: "{{ lookup('randpass', '32', uppercase=10,
+      lowercase=10, digits=10) }}"
+    redshift_master_password: "{{ lookup('randpass', '32', uppercase=10,
+      lowercase=10, digits=10) }}"
+
+- name: Rotate application DB password to one not in TF state
+  command: >
+    aws rds modify-db-instance --region "{{ region }}"
+    --db-instance-identifier "{{ application_database_identifier }}"
+    --master-user-password "{{ db_master_password }}"
+  when: (state == "present")
+
+- name: Update secret for the application DB credentials
+  vars:
+    address: "{{ app_db_facts.instances[0].endpoint.address }}"
+    db_name: "{{ application_database_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ application_database_admin_username }}",
+      "dbpassword":"{{ db_master_password }}",
+      "dburl":"jdbc:postgresql://{{ url }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ application_secrets_kms_key_alias }}"
+    name: "CodaMetrixApplication/DatabaseAdmin/{{ env }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"
+
+- name: Rotate Redshift password to one not in TF state
+  command: >
+    aws redshift modify-cluster --region "{{ region }}"
+    --cluster-identifier "{{ application_data_warehouse_identifier }}"
+    --master-user-password "{{ redshift_master_password }}"
+  when: (state == "present")
+
+- name: Update secret for the redshift master credentials
+  vars:
+    address: "{{ redshift_cluster_facts.results[0].endpoint.address }}"
+    port: "{{ redshift_cluster_facts.results[0].endpoint.port }}"
+    db_name: "{{ application_data_warehouse_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}:{{ port }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ application_data_warehouse_admin_username }}",
+      "dbpassword":"{{ redshift_master_password }}",
+      "dburl":"jdbc:redshift://{{ url }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ application_secrets_kms_key_alias }}"
+    name: "CodaMetrixApplication/DataWarehouseAdmin/{{ env }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"
+
+- name: Rotate Mirth DB password to one not in TF state
+  command: >
+    aws rds modify-db-instance --region "{{ region }}"
+    --db-instance-identifier "{{ mirth_database_identifier }}"
+    --master-user-password "{{ mirthdb_master_password }}"
+  when: (state == "present")
+
+- name: Update secret for the Mirth DB credentials
+  vars:
+    address: "{{ application_mirth_database_facts.instances[0].endpoint.address }}"
+    db_name: "{{ mirth_database_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ mirth_database_admin_username }}",
+      "dbpassword":"{{ mirthdb_master_password }}",
+      "dburl":"jdbc:postgresql://{{ url }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ application_secrets_kms_key_alias }}"
+    name: "{{ mirth_database_admin_secret_name }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"
+
+- name: Rotate Ingress Mirth DB password to one not in TF state
+  command: >
+    aws rds modify-db-instance --region "{{ region }}"
+    --db-instance-identifier "{{ ingress_mirth_database_identifier }}"
+    --master-user-password "{{ ingress_mirthdb_master_password }}"
+  when: (state == "present")
+
+- name: Update secret for the Ingress Mirth DB credentials
+  vars:
+    address: "{{ ingress_mirth_database_facts.instances[0].endpoint.address }}"
+    db_name: "{{ mirth_database_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ mirth_database_admin_username }}",
+      "dbpassword":"{{ ingress_mirthdb_master_password }}",
+      "dburl":"jdbc:postgresql://{{ url }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ application_secrets_kms_key_alias }}"
+    name: "{{ ingress_mirth_database_admin_secret_name }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"

@@ -1,0 +1,109 @@
+---
+developers:
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: JeffreyTaylor
+    email: jeffrey@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: JeffWoodward
+    email: woody@codametrix.com
+  - name: BrianMottershead
+    email: brian@codametrix.com
+  - name: PhilCadigan
+    email: pcadigan@codametrix.com
+  - name: MattDemoy
+    email: matt@codametrix.com
+  - name: JeffToussaint
+    email: jtoussaint@codametrix.com
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: KeithGrohbrugge
+    email: keith@codametrix.com
+  - name: RobCosta
+    email: rob@codametrix.com
+  - name: KasiMusunuri
+    email: kasi@codametrix.com
+  - name: MichaelRamos
+    email: michaelramos@codametrix.com
+  - name: ToniAbrams
+    email: toni@codametrix.com
+  - name: SrinivasPandrangi
+    email: srinivas@codametrix.com
+  - name: DebbieWalker
+    email: debbie@codametrix.com
+  - name: SayyaraRajapova
+    email: sayyara@codametrix.com
+  - name: CarolinePierce
+    email: caroline@codametrix.com
+  - name: JoelRegen
+    email: joel@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+  - name: MikeLane
+    email: mlane@codametrix.com
+
+# Ops Users
+ops_users:
+  # Phill Mell-Davies
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/pcd
+    username: phillmelldavies
+    group: system:masters
+
+  # Quincy Els
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/quincy@codametrix.com
+    username: quincyels
+    group: system:masters
+
+  # Brian Mottershead
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/brian@codametrix.com-{{ env }}
+    username: brianmottershead-{{ env }}
+    group: system:masters
+
+  # Mahesh Narayanan
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/mahesh@codametrix.com-{{ env }}
+    username: maheshnarayanan-{{ env }}
+    group: system:masters
+
+  # Phil Cadigan
+  - userarn: arn:aws:iam::{{ aws_account_id }}:user/pcadigan@codametrix.com-{{ env }}
+    username: philcadigan-{{ env }}
+    group: system:masters
+
+  # Jenkins Build User
+  - userarn: arn:aws:iam::{{ codametrix_tools_account_id }}:user/CodametrixTools-tools-BuildUser
+    username: build-user
+    group: system:masters
+
+bastion_additional_users:
+  - name: JimTice
+    email: jim@codametrix.com
+  - name: KellyKeene
+    email: kelly@codametrix.com
+
+database_additional_users:
+  - DundasBI
+  - JimTice
+  - KasiMusunuri
+  - SayyaraRajapova
+  - KellyKeene
+
+database_superusers: []
+
+data_warehouse_additional_users:
+  - DundasBI
+
+data_warehouse_additional_rw_users:
+  - WarehouseLoader
+
+data_warehouse_additional_superusers:
+  - MikeBaglioSuperuser
+  - BrianMottersheadSuperuser
+  - SrinivasPandrangi
+  - MichaelRamos
+
+data_lake_additional_users:
+  - DundasBI

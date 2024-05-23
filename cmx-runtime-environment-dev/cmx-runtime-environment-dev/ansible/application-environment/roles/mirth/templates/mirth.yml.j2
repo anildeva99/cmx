@@ -1,0 +1,156 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mirth-additional-properties
+data:
+  maxheapsize: "{{ mirth_max_heap_size }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mirth-configuration-map
+data:
+  configurationMap.properties: "{{ lookup('template', 'configurationMap.properties.j2') }}"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mirth
+  labels:
+    app: mirth
+    version: {{ image_versions.cmx_mirth }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mirth
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: mirth
+        version: {{ image_versions.cmx_mirth }}
+
+      annotations:
+        iam.amazonaws.com/role: {{ mirth_role_name }}
+    spec:
+      volumes:
+        - name: mirth-configuration-map-volume
+          configMap:
+            name: mirth-configuration-map
+        - name: newrelic-javaagent-configuration-map-volume
+          configMap:
+            name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-mirth:{{ image_versions.cmx_mirth }}
+        imagePullPolicy: {{ cmx_mirth_image_pull_policy }}
+        name: mirth
+        resources:
+          limits:
+            memory: {{ mirth_max_container_memory }}
+            cpu: {{ mirth_max_cpus }}
+          requests:
+            memory: {{ mirth_min_container_memory }}
+            cpu: {{ mirth_min_cpus }}
+        command: ["/cmx-mirth.sh", "java", "-Xms{{ mirth_min_heap_size }}", "-Xmx{{ mirth_max_heap_size }}", "-jar", "mirth-server-launcher.jar" ]
+        #command: ["bash", "-c", "while(true); do sleep 1 ; done"]
+        volumeMounts:
+          - name: mirth-configuration-map-volume
+            mountPath: /opt/mirth-connect/appdata/configurationMap.properties
+            subPath: configurationMap.properties
+            readOnly: false
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+        ports:
+          - containerPort: {{ container_ports.cmx_mirth }}
+            name: https
+            protocol: TCP
+
+# We use the same ports for App Mirth -> Ingress Mirth ports as Exporter -> App Mirth
+{% for app_mirth_to_ingress_mirth_open_port in app_mirth_to_ingress_mirth_open_ports %}
+          - protocol: TCP
+            name: tcp-{{ app_mirth_to_ingress_mirth_open_port }}
+            containerPort: {{ app_mirth_to_ingress_mirth_open_port }}
+{% endfor %}
+
+        env:
+          - name: MIRTH_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: mirth
+                key: dburl
+          - name: MIRTH_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: mirth
+                key: dbusername
+          - name: MIRTH_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mirth
+                key: dbpassword
+          - name: MIRTH_DB_MAX_CONNECTIONS
+            value: "{{ mirth_db_max_connections }}"
+          - name: MIRTH_MAX_HEAP_SIZE
+            valueFrom:
+              configMapKeyRef:
+                name: mirth-additional-properties
+                key: maxheapsize
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: mirth
+spec:
+  selector:
+    app: mirth
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_mirth }}
+    targetPort: {{ container_ports.cmx_mirth }}
+
+# We use the same ports for App Mirth -> Ingress Mirth ports as Exporter -> App Mirth
+{% for app_mirth_to_ingress_mirth_open_port in app_mirth_to_ingress_mirth_open_ports %}
+  - protocol: TCP
+    name: tcp-{{ app_mirth_to_ingress_mirth_open_port }}
+    port: {{ app_mirth_to_ingress_mirth_open_port }}
+    targetPort: {{ app_mirth_to_ingress_mirth_open_port }}
+{% endfor %}

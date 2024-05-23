@@ -1,0 +1,136 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Update users preparatory tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Apply preparatory configuration for the bastion
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Create local files and configuration for the bastion
+      import_role:
+        name: bastion
+        tasks_from: locals.yml
+
+    - name: Apply preparatory configuration for the mirth databases
+      import_role:
+        name: mirth-database
+        tasks_from: pre.yml
+
+    - name: Create local files and configuration for the mirth database
+      import_role:
+        name: mirth-database
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for connecting to the bastion host
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+    # Exporting public keys, necessary for generating the terraform vars file
+    - name: Export the customer router router public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_customerrouter_private_key }}"
+        aws_secret_keypair_public_key: customerrouter_keypair_public_key
+      import_role:
+        name: keypair-secrets
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Export the mirth public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_mirth_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: mirth_keypair_public_key
+      import_role:
+        name: keypair-secrets
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Export baston host public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: bastion_host_keypair_public_key
+      import_role:
+        name: keypair-secrets
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+- name: Add users to the bastion host tasks
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: present
+  tasks:
+    - name: Add user to the bastion host
+      block:
+        - import_role:
+            name: bastion
+            tasks_from: configure-bastion.yml
+      rescue:
+        - name: Fail, likely because secrets need to be added via running terraform
+          fail:
+            msg: |
+              Failed to add users to the bastion. Run terraform plan, it may be necessary to add secrets
+              for users, but be sure that there are no other changes waiting to be applied.
+
+- name: Add users to the mirth database
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: present
+  tasks:
+    - name: Add users to the mirth database
+      vars:
+        database_address: "{{ hostvars['localhost']['mirth_database_facts'].instances[0].endpoint.address }}"
+        database_credentials: "{{ lookup('aws_secret',
+          mirth_database_admin_secret_name,
+          region=region) }}"
+      import_role:
+        name: mirth-database
+        tasks_from: configure-database.yml
+
+- name: Add users post tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml
+
+- name: Import deploy-cluster-bastion.yml
+  import_playbook: deploy-cluster-bastion.yml

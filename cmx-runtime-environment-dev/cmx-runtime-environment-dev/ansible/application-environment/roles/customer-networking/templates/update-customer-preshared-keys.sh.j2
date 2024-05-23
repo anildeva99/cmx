@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Enter Partners Pre-shared Key
+echo "Rotating Pre-shared Key: CodaMetrixApplication/CustomerVPN/{{ env }}-partners"
+echo "Enter the Partners pre-shared key (blank to skip): "
+read partnersKey
+export PARTNERS_PRE_SHARED_KEY=$partnersKey
+
+if [ "$PARTNERS_PRE_SHARED_KEY" != "" ]; then
+  # For now, just save the secret. ultimately should trigger update of the router
+  aws secretsmanager update-secret --region '{{ region }}' --secret-id "CodaMetrixApplication/CustomerVPN/{{ env }}-partners" \
+      --description "Secret for VPN connection with Partners" \
+      --kms-key-id '{{ application_secrets_kms_key_alias }}' \
+      --secret-string "$PARTNERS_PRE_SHARED_KEY"
+fi
+
+# Enter CU Medicine Pre-shared Key
+echo "Rotating Pre-shared Key: CodaMetrixApplication/CustomerVPN/{{ env }}-cumedicine"
+echo "Enter the CU Medicine pre-shared key (blank to skip): "
+read cumedicineKey
+export CUMEDICINE_PRE_SHARED_KEY=$cumedicineKey
+
+if [ "$CUMEDICINE_PRE_SHARED_KEY" != "" ]; then
+  # For now, just save the secret. ultimately should trigger update of the router
+  aws secretsmanager update-secret --region '{{ region }}' --secret-id "CodaMetrixApplication/CustomerVPN/{{ env }}-cumedicine" \
+      --description "Secret for VPN connection with CU Medicine" \
+      --kms-key-id '{{ application_secrets_kms_key_alias }}' \
+      --secret-string "$CUMEDICINE_PRE_SHARED_KEY"
+fi

@@ -1,0 +1,407 @@
+---
+# Note!: CREATE has no effect on spectrum_schema
+# (or any external schema), and doesn't even enable usage.
+# Note!: In order to create tables in an external schema,
+# you must be the owner or a superuser.
+- name: Set privileges for the various schemas
+  set_fact:
+    dev_privs:
+      - public:USAGE/ALL:SELECT
+      - spectrum_schema:USAGE/ALL:SELECT
+      - customer_views:USAGE/ALL:SELECT
+      - reports:USAGE/ALL:SELECT
+    user_privs:
+      - public:USAGE/ALL:SELECT
+      - spectrum_schema:USAGE/ALL:SELECT
+      - customer_views:USAGE/ALL:SELECT
+      - reports:USAGE/ALL:SELECT
+    rw_user_privs:
+      - public:CREATE/ALL:SELECT,INSERT,UPDATE,DELETE
+      - spectrum_schema:USAGE/ALL:SELECT,INSERT,UPDATE,DELETE
+      - customer_views:USAGE/ALL:SELECT,INSERT,UPDATE,DELETE
+      - reports:USAGE/ALL:SELECT,INSERT,UPDATE,DELETE
+    super_user_privs:
+      - public:CREATE/ALL:ALL
+      - spectrum_schema:USAGE/ALL:ALL
+      - customer_views:USAGE/ALL:ALL
+      - reports:USAGE/ALL:ALL
+
+- name: Add redshift user (role) for each developer
+  redshift_user:
+    db: "{{ application_data_warehouse_name }}"
+    expires: "infinity"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    password: "{{ database_temporary_password }}"
+    privs: "{{ dev_privs }}"
+    state: "{{ state }}"
+    update_password: on_create
+    user: "{{ dev.name|lower }}"
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+# Do for all plays below
+- name: Give the developers access to all schemas in the default database
+  community.postgresql.postgresql_query:
+    db: "{{ application_data_warehouse_name }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT USAGE ON SCHEMA public TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+      GRANT USAGE ON SCHEMA spectrum_schema TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA spectrum_schema TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+      GRANT USAGE ON SCHEMA customer_views TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA customer_views TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+      GRANT USAGE ON SCHEMA reports TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA reports TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+    ssl_mode: require
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+  when: (state == 'present')
+
+- name: Give the developers access to all schemas in the cmx database
+  community.postgresql.postgresql_query:
+    db: cmx
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT USAGE ON SCHEMA public TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+      GRANT USAGE ON SCHEMA spectrum_schema TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA spectrum_schema TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+      GRANT USAGE ON SCHEMA customer_views TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA customer_views TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+      GRANT USAGE ON SCHEMA reports TO {{ dev.name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA reports TO {{ dev.name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT ON TABLES TO {{ dev.name|lower }};
+    ssl_mode: require
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+  when: (state == 'present')
+
+- name: Give the developers access to all schemas in customer specific databases
+  community.postgresql.postgresql_query:
+    db: "{{ dev_sys[1] }}"
+    login_host: "{{ dw_address }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    port: 5439
+    query: >
+      GRANT USAGE ON SCHEMA public TO {{ dev_sys[0].name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ dev_sys[0].name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ dev_sys[0].name|lower }};
+      GRANT USAGE ON SCHEMA spectrum_schema TO {{ dev_sys[0].name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA spectrum_schema TO {{ dev_sys[0].name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT ON TABLES TO {{ dev_sys[0].name|lower }};
+      GRANT USAGE ON SCHEMA customer_views TO {{ dev_sys[0].name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA customer_views TO {{ dev_sys[0].name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT ON TABLES TO {{ dev_sys[0].name|lower }};
+      GRANT USAGE ON SCHEMA reports TO {{ dev_sys[0].name|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA reports TO {{ dev_sys[0].name|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT ON TABLES TO {{ dev_sys[0].name|lower }};
+    ssl_mode: require
+  loop: "{{ developers|product(healthsystems)|list }}"
+  loop_control:
+    loop_var: dev_sys
+  when: (state == 'present')
+
+- name: Add redshift user (role) for each additional user
+  redshift_user:
+    db: "{{ application_data_warehouse_name }}"
+    expires: "infinity"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    password: "{{ database_temporary_password }}"
+    privs: "{{ user_privs }}"
+    state: "{{ state }}"
+    update_password: on_create
+    user: "{{ addit_user|lower }}"
+  loop: "{{ data_warehouse_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+
+- name: Give the additional users access to all schemas in the default database
+  community.postgresql.postgresql_query:
+    db: "{{ application_data_warehouse_name }}"
+    login_host: "{{ dw_address }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    port: 5439
+    query: >
+      GRANT USAGE ON SCHEMA public TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+      GRANT USAGE ON SCHEMA spectrum_schema TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA spectrum_schema TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+      GRANT USAGE ON SCHEMA customer_views TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA customer_views TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+      GRANT USAGE ON SCHEMA reports TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA reports TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+  when: (state == 'present')
+
+- name: Give the additional users access to all schemas in the cmx database
+  community.postgresql.postgresql_query:
+    db: cmx
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT USAGE ON SCHEMA public TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+      GRANT USAGE ON SCHEMA spectrum_schema TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA spectrum_schema TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+      GRANT USAGE ON SCHEMA customer_views TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA customer_views TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+      GRANT USAGE ON SCHEMA reports TO {{ addit_user|lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA reports TO {{ addit_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT ON TABLES TO {{ addit_user|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+  when: (state == 'present')
+
+- name: Give the additional users access to all schemas in customer specific databases
+  community.postgresql.postgresql_query:
+    db: "{{ addit_user_sys[1] }}"
+    login_host: "{{ dw_address }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    port: 5439
+    query: >
+      GRANT USAGE ON SCHEMA public TO {{ addit_user_sys[0] | lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ addit_user_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ addit_user_sys[0] | lower }};
+      GRANT USAGE ON SCHEMA spectrum_schema TO {{ addit_user_sys[0] | lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA spectrum_schema TO {{ addit_user_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT ON TABLES TO {{ addit_user_sys[0] | lower }};
+      GRANT USAGE ON SCHEMA customer_views TO {{ addit_user_sys[0] | lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA customer_views TO {{ addit_user_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT ON TABLES TO {{ addit_user_sys[0] | lower }};
+      GRANT USAGE ON SCHEMA reports TO {{ addit_user_sys[0] | lower }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA reports TO {{ addit_user_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT ON TABLES TO {{ addit_user_sys[0] | lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_users|product(healthsystems)|list }}"
+  loop_control:
+    loop_var: addit_user_sys
+  when: (state == 'present')
+
+- name: Add redshift user (role) for each additional RW user
+  redshift_user:
+    db: "{{ application_data_warehouse_name }}"
+    expires: "infinity"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    password: "{{ database_temporary_password }}"
+    privs: "{{ rw_user_privs }}"
+    state: "{{ state }}"
+    update_password: on_create
+    user: "{{ addit_rw_user|lower }}"
+  loop: "{{ data_warehouse_additional_rw_users }}"
+  loop_control:
+    loop_var: addit_rw_user
+
+- name: Give the additional RW users access to all schemas in the default database
+  community.postgresql.postgresql_query:
+    db: "{{ application_data_warehouse_name }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT CREATE ON SCHEMA public TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+      GRANT CREATE ON SCHEMA spectrum_schema TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA spectrum_schema TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+      GRANT CREATE ON SCHEMA customer_views TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA customer_views TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+      GRANT CREATE ON SCHEMA reports TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA reports TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_rw_users }}"
+  loop_control:
+    loop_var: addit_rw_user
+  when: (state == 'present')
+
+- name: Give the additional RW users access to all schemas in the cmx database
+  community.postgresql.postgresql_query:
+    db: cmx
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT CREATE ON SCHEMA public TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+      GRANT CREATE ON SCHEMA spectrum_schema TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA spectrum_schema TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+      GRANT CREATE ON SCHEMA customer_views TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA customer_views TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+      GRANT CREATE ON SCHEMA reports TO {{ addit_rw_user|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA reports TO {{ addit_rw_user|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_rw_users }}"
+  loop_control:
+    loop_var: addit_rw_user
+  when: (state == 'present')
+
+- name: Give the additional RW users access to all schemas in the customer specific databases
+  community.postgresql.postgresql_query:
+    db: "{{ addit_rw_user_sys[1] }}"
+    login_host: "{{ dw_address }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    port: 5439
+    query: >
+      GRANT CREATE ON SCHEMA public TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO {{ addit_rw_user_sys[0]|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT CREATE ON SCHEMA spectrum_schema TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA spectrum_schema TO {{ addit_rw_user_sys[0]|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT CREATE ON SCHEMA customer_views TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA customer_views TO {{ addit_rw_user_sys[0]|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT CREATE ON SCHEMA reports TO {{ addit_rw_user_sys[0]|lower }};
+      GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA reports TO {{ addit_rw_user_sys[0]|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {{ addit_rw_user_sys[0]|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_rw_users|product(healthsystems)|list }}"
+  loop_control:
+    loop_var: addit_rw_user_sys
+  when: (state == 'present')
+
+- name: Add redshift user (role) for each additional superuser
+  redshift_user:
+    db: "{{ application_data_warehouse_name }}"
+    expires: "infinity"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    password: "{{ database_temporary_password }}"
+    permission_flags:
+      - SUPERUSER
+    privs: "{{ super_user_privs }}"
+    state: "{{ state }}"
+    update_password: on_create
+    user: "{{ su|lower }}"
+  loop: "{{ data_warehouse_additional_superusers }}"
+  loop_control:
+    loop_var: su
+
+- name: Give the additional superusers access to all schemas in the default database
+  community.postgresql.postgresql_query:
+    db: "{{ application_data_warehouse_name }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT CREATE ON SCHEMA public TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {{ su|lower }};
+      GRANT CREATE ON SCHEMA spectrum_schema TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA spectrum_schema TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT ALL ON TABLES TO {{ su|lower }};
+      GRANT CREATE ON SCHEMA customer_views TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA customer_views TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT ALL ON TABLES TO {{ su|lower }};
+      GRANT CREATE ON SCHEMA reports TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA reports TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT ALL ON TABLES TO {{ su|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_superusers }}"
+  loop_control:
+    loop_var: su
+  when: (state == 'present')
+
+- name: Give the additional superusers access to all schemas in the cmx database
+  community.postgresql.postgresql_query:
+    db: cmx
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT CREATE ON SCHEMA public TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {{ su|lower }};
+      GRANT CREATE ON SCHEMA spectrum_schema TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA spectrum_schema TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT ALL ON TABLES TO {{ su|lower }};
+      GRANT CREATE ON SCHEMA customer_views TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA customer_views TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT ALL ON TABLES TO {{ su|lower }};
+      GRANT CREATE ON SCHEMA reports TO {{ su|lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA reports TO {{ su|lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT ALL ON TABLES TO {{ su|lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_superusers }}"
+  loop_control:
+    loop_var: su
+  when: (state == 'present')
+
+- name: Give the additional superusers access to all schemas in the customer specific databases
+  community.postgresql.postgresql_query:
+    db: "{{ su_sys[1] }}"
+    login_host: "{{ dw_address }}"
+    login_password: "{{ dw_credentials.dbpassword }}"
+    login_user: "{{ application_data_warehouse_admin_username }}"
+    port: 5439
+    query: >
+      GRANT CREATE ON SCHEMA public TO {{ su_sys[0] | lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO {{ su_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {{ su_sys[0] | lower }};
+      GRANT CREATE ON SCHEMA spectrum_schema TO {{ su_sys[0] | lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA spectrum_schema TO {{ su_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA spectrum_schema GRANT ALL ON TABLES TO {{ su_sys[0] | lower }};
+      GRANT CREATE ON SCHEMA customer_views TO {{ su_sys[0] | lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA customer_views TO {{ su_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA customer_views GRANT ALL ON TABLES TO {{ su_sys[0] | lower }};
+      GRANT CREATE ON SCHEMA reports TO {{ su_sys[0] | lower }};
+      GRANT ALL ON ALL TABLES IN SCHEMA reports TO {{ su_sys[0] | lower }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA reports GRANT ALL ON TABLES TO {{ su_sys[0] | lower }};
+    ssl_mode: require
+  loop: "{{ data_warehouse_additional_superusers|product(healthsystems)|list }}"
+  loop_control:
+    loop_var: su_sys
+  when: (state == 'present')

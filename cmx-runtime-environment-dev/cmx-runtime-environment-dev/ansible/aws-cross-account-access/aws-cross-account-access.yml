@@ -1,0 +1,9 @@
+---
+- name: Configure AWS account access
+  hosts: local
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Import the aws-cross-account-access role
+      import_role:
+        name: aws-cross-account-access

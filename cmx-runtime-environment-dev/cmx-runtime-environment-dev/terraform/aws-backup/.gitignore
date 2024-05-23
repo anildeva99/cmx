@@ -1,0 +1,3 @@
+backend.tf
+*.x
+files/kinesis-firehose-cloudwatch-logs-processor.zip

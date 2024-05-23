@@ -1,0 +1,33 @@
+---
+- name: "Set ExternalSecrets resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'externalsecrets.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: Clone cmx-deploy-config repo
+  git:
+    accept_hostkey: true
+    depth: 1
+    dest: "{{ temp_directory }}/cmx-deploy-config"
+    repo: git@github.com:CodaMetrix/cmx-deploy-config.git
+    version: "{{ deploy_config_branch }}"
+
+- name: Parse Service Version(s)
+  set_fact:
+    image_versions: "{{ lookup('file',
+      '{{ temp_directory }}/cmx-deploy-config/service-versions-{{ env }}.yml')|
+      from_yaml }}"
+
+- name: Remove cmx-deploy-config repo
+  file:
+    path: "{{ temp_directory }}/cmx-deploy-config"
+    state: absent
+
+- name: "Set Mirth resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'mirth.yml.j2') }}"
+    state: "{{ state }}"

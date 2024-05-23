@@ -1,0 +1,112 @@
+---
+region: us-east-1
+management_bucket: management.cmxcentral.codametrix.com
+region_specific_elb_hosted_zone_id: Z35SXDOTRQ7X7K
+
+# AWS CodaMetrix Central account
+aws_account_name: cmxcentral
+aws_account_id: "048429806352"
+ip_range_prefix: "10.81"
+
+shared_resource_tags:
+  BillingCategory: Application
+  BillingTeam: Engineering
+  BillingEnvironment: Testing
+  BillingApplication: CMx
+  Environment: "{{ env }}"
+  Usage: CodaMetrix Application
+
+#Recovery Window for AWS Secrets
+aws_secrets_recovery_window_in_days: 7
+
+#################
+# Mirth resources
+#################
+mirth_docker_image_version: 1.5.0
+mirth_min_heap_size: "2g"
+mirth_max_heap_size: "3g"
+mirth_instance_type: c5.large  # !!! Keep this small until we need something bigger
+
+# Mirth database parameters
+mirth_database_multi_az: false
+mirth_database_allocated_storage_gb: 64
+mirth_database_max_allocated_storage_gb: 1024
+mirth_database_version: "11.10"
+mirth_database_instance_class: "db.t3.small" # !!! Keep this small until we need something bigger
+mirth_database_backup_retention_period: 7
+mirth_database_deletion_protection: true
+mirth_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+mirth_database_monitoring_interval: 30
+mirth_database_secret_recovery_window_days: 30
+
+# Elasticsearch parameters
+elasticsearch_version: "7.1"
+elasticsearch_ebs_volume_size: "512" # !!! Keep this small until we need something bigger
+elasticsearch_instance_count: 2
+elasticsearch_dedicated_master_enabled: false
+elasticsearch_dedicated_master_count: 1
+elasticsearch_zone_awareness_enabled: true
+
+# Bastion parameters
+bastion_instance_type: t2.micro
+
+guardduty_detector_enable: false
+is_guardduty_member: false
+
+#Dynamic Resources
+create_es_service_linked_role: false
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+firehose_lambda_function_dir: files/firehose_lambda_function
+cloud_watch_ingest_to_elasticsearch_log_groups:
+  cloudtrail_log_group:
+    name: AWSAccountSetup-CloudTrailLogGroup-THA9N58R837R
+    arn: arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:AWSAccountSetup-CloudTrailLogGroup-THA9N58R837R
+    kinesis_shard_count: 1
+    index_name: "cloudtrail"
+    log_template_name: "es_cloudtrail"
+  mirth_postgresql_log_group :
+    name: /aws/rds/instance/cmxtrafficcop-{{ env }}-mirth-db/postgresql
+    arn: arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/cmxtrafficcop-{{ env }}-mirth-db/postgresql
+    kinesis_shard_count: 1
+    index_name: "mirth-postgresql"
+    log_template_name: "es_postgres"
+
+# Security Hub
+is_securityhub_account: false
+
+####################
+#  CloudWatch Alarms
+####################
+low_storage_space_cloudwatch_alarm:
+  elasticsearch:
+    elasticsearch:
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in Megabytes, set to 128GB (total volume size is 512 GB)
+      free_storage_space_threshold: 131072
+  rds:
+    mirth-db:
+      name: mirth
+      db_identifier: cmxtrafficcop-{{ env }}-mirth-db
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes, set to 64 Gigabytes (max volume size is 1024 GB)
+      free_storage_space_threshold: 68719476736
+      unit: Bytes
+
+# Alert if Mirth or the Customer Router status checks failed or less than 5K bytes/sec throughput
+mirth_alarms_enabled: true
+mirth_liveness_threshold: 0
+mirth_network_throughput_threshold: 5120
+customerrouter_liveness_threshold: 0
+customerrouter_network_throughput_threshold: 5120
+
+# Mirth
+mirth_processing_indicator: T

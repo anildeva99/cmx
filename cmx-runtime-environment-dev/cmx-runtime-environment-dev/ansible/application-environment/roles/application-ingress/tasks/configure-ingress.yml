@@ -1,0 +1,230 @@
+---
+- name: Get ACM certificate details for the CMX Automate API gateway
+  community.aws.aws_acm_info:
+    domain_name: "{{ cmx_automate_dns_name }}"
+    region: "{{ region }}"
+  register: cmx_automate_certificate_info
+
+- name: Get ACM certificate details for the Constellation API gateway
+  community.aws.aws_acm_info:
+    domain_name: "{{ application_www_dns_address }}"
+    region: "{{ region }}"
+  register: api_gateway_certificate_info
+
+- name: Get ACM certificate details for the Mirth Connect API gateway
+  community.aws.aws_acm_info:
+    domain_name: "{{ application_mirthconnect_dns_address }}"
+    region: "{{ region }}"
+  register: mirth_connect_api_gateway_certificate_info
+
+- name: Get Regional WAF ACL ID
+  community.aws.aws_waf_info:
+    name: "{{ env }}-regional-generic-acl"
+    region: "{{ region }}"
+    waf_regional: true
+  register: regional_web_acl
+
+- name: Get CMX Automate Ingress ALB Security Group info
+  amazon.aws.ec2_group_info:
+    filters:
+      "tag:Type": cmx_automate_ingress_sg
+      "tag:Environment": "{{ env }}"
+    region: "{{ region }}"
+  register: cmx_automate_ingress_sg
+
+- name: Get API Ingress ALB Security Group info
+  amazon.aws.ec2_group_info:
+    filters:
+      "tag:Type": application_cmx_api_ingress_sg
+      "tag:Environment": "{{ env }}"
+    region: "{{ region }}"
+  register: cmx_api_ingress_sg
+
+- name: Get Public Whitelist API Ingress ALB Security Group info
+  amazon.aws.ec2_group_info:
+    filters:
+      "tag:Type": application_cmx_api_public_whitelist_ingress_sg
+      "tag:Environment": "{{ env }}"
+    region: "{{ region }}"
+  register: cmx_api_public_whitelist_ingress_sg
+
+- name: Get Mirth Connect API Ingress ALB Security Group info
+  amazon.aws.ec2_group_info:
+    filters:
+      "tag:Type": application_mirth_connect_api_ingress_sg
+      "tag:Environment": "{{ env }}"
+    region: "{{ region }}"
+  register: cmx_application_mirth_connect_api_ingress_sg
+
+- name: "Set ingress resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'ingress.yml.j2') }}"
+    state: "{{ state }}"
+  register: ingress
+  until: (ingress.changed)
+
+- name: Get CMX Automate (external) Route53 hosted zone to insert records into
+  community.aws.route53_info:
+    dns_name: "{{ cmx_automate_dns_name }}"
+    hosted_zone_method: list_by_name
+    query: hosted_zone
+    region: "{{ region }}"
+  register: cmx_automate_hosted_zones
+
+- name: Get application-zone Route53 hosted zone to insert records into
+  community.aws.route53_info:
+    dns_name: "{{ application_env_dns_name }}"
+    hosted_zone_method: list_by_name
+    query: hosted_zone
+    region: "{{ region }}"
+  register: application_hosted_zones
+
+- name: Get environment-zone Route53 hosted zone to insert records into
+  community.aws.route53_info:
+    dns_name: "{{ environment_dns_name }}"
+    hosted_zone_method: list_by_name
+    query: hosted_zone
+    region: "{{ region }}"
+  register: environment_hosted_zones
+
+- name: Get CMX Automate Ingress facts
+  community.kubernetes.k8s_info:
+    api_version: networking.k8s.io/v1beta1
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    kind: Ingress
+    name: cmx-automate-ingress
+    namespace: istio-system
+  register: cmx_automate_ingress_gateway_facts
+  until: (cmx_automate_ingress_gateway_facts.resources[0].status.loadBalancer.ingress is defined)
+  retries: 60
+  delay: 10
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Get API Ingress facts
+  community.kubernetes.k8s_info:
+    api_version: networking.k8s.io/v1beta1
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    kind: Ingress
+    name: cmx-api-ingress
+    namespace: istio-system
+  register: cmx_api_ingress_gateway_facts
+  until: (cmx_api_ingress_gateway_facts.resources[0].status.loadBalancer.ingress is defined)
+  retries: 60
+  delay: 10
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Get Public Whitelist Ingress facts
+  community.kubernetes.k8s_info:
+    api_version: networking.k8s.io/v1beta1
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    kind: Ingress
+    name: cmx-api-public-whitelist-ingress
+    namespace: istio-system
+  register: cmx_api_public_whitelist_ingress_gateway_facts
+  until: (cmx_api_public_whitelist_ingress_gateway_facts.resources[0].status.loadBalancer.ingress is defined)
+  retries: 60
+  delay: 10
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Get Mirth Connect Ingress facts
+  community.kubernetes.k8s_info:
+    api_version: networking.k8s.io/v1beta1
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    kind: Ingress
+    name: cmx-mirth-connect-api-ingress
+    namespace: istio-system
+  register: cmx_mirth_connect_api_ingress_gateway_facts
+  until: (cmx_mirth_connect_api_ingress_gateway_facts.resources[0].status.loadBalancer.ingress is defined)
+  retries: 60
+  delay: 10
+
+# CMX Automate (external) URL
+# TODO: [DEVOPS-391] Switch to using the community.aws.route53 module
+- name: Create the CMX Automate (external) route53 record for the CMX Automate ingress
+  command: >
+    aws route53 change-resource-record-sets
+    --region "{{ region }}"
+    --hosted-zone-id "{{ cmx_automate_hosted_zones.HostedZones[0].Id }}"
+    --change-batch '{ "Changes": [{"Action":
+      "{{ 'UPSERT' if state == 'present' else 'DELETE' }}",
+      "ResourceRecordSet": { "Name": "{{ cmx_automate_dns_name }}",
+      "Type": "A",
+      "AliasTarget": {"DNSName": "dualstack.{{ cmx_automate_ingress_gateway_facts.resources[0].status.loadBalancer.ingress[0].hostname }}",
+      "EvaluateTargetHealth": false,
+      "HostedZoneId": "{{ region_specific_elb_hosted_zone_id }}" }} }]}'
+
+# www.<env>.application.codametrix.com
+# TODO: [DEVOPS-391] Switch to using the community.aws.route53 module
+- name: Create the application-zone www route53 record for the CMX API ingress
+  command: >
+    aws route53 change-resource-record-sets
+    --region "{{ region }}"
+    --hosted-zone-id "{{ application_hosted_zones.HostedZones[0].Id }}"
+    --change-batch '{"Changes": [{ "Action":
+      "{{ 'UPSERT' if state == 'present' else 'DELETE' }}",
+      "ResourceRecordSet":
+      {"Name": "{{ application_www_dns_address }}",
+      "Type": "CNAME", "TTL": 300, "ResourceRecords":
+      [{"Value": "{{ cmx_api_ingress_gateway_facts.resources[0].status.loadBalancer.ingress[0].hostname }}" }] }} ]}'
+
+# www-public-whitelisted.<env>.application.codametrix.com
+# TODO: [DEVOPS-391] Switch to using the community.aws.route53 module
+- name: Create the environment-zone www route53 record for the CMX API Public Whitelist ingress
+  command: >
+    aws route53 change-resource-record-sets
+    --region "{{ region }}"
+    --hosted-zone-id "{{ application_hosted_zones.HostedZones[0].Id }}"
+    --change-batch '{"Changes": [{"Action":
+      "{{ 'UPSERT' if state == 'present' else 'DELETE' }}",
+      "ResourceRecordSet": {"Name": "{{ application_public_whitelist_www_dns_address }}",
+      "Type": "CNAME", "TTL": 300, "ResourceRecords":
+      [{ "Value": "{{ cmx_api_public_whitelist_ingress_gateway_facts.resources[0].status.loadBalancer.ingress[0].hostname }}" }] }} ]}'
+
+# www.<env>.codametrix.com
+# TODO: [DEVOPS-391] Switch to using the community.aws.route53 module
+- name: Create the environment-zone www route53 record for the CMX API ingress
+  command: >
+    aws route53 change-resource-record-sets
+    --region "{{ region }}"
+    --hosted-zone-id "{{ environment_hosted_zones.HostedZones[0].Id }}"
+    --change-batch '{"Changes": [{"Action":
+      "{{ 'UPSERT' if state == 'present' else 'DELETE' }}",
+      "ResourceRecordSet": {"Name": "{{ environment_www_dns_address }}",
+      "Type": "CNAME", "TTL": 300, "ResourceRecords":
+      [{ "Value": "{{ cmx_api_ingress_gateway_facts.resources[0].status.loadBalancer.ingress[0].hostname }}" }] }} ]}'
+
+# mirth.<env>.application.codametrix.com
+# TODO: [DEVOPS-391] Switch to using the community.aws.route53 module
+- name: Create the application-zone mirth route53 record for the CMX Mirth Connect ingress
+  command: >
+    aws route53 change-resource-record-sets
+    --region "{{ region }}"
+    --hosted-zone-id "{{ application_hosted_zones.HostedZones[0].Id }}"
+    --change-batch '{"Changes": [{"Action":
+      "{{ 'UPSERT' if state == 'present' else 'DELETE' }}",
+      "ResourceRecordSet": {"Name": "{{ application_mirthconnect_dns_address }}",
+      "Type": "CNAME", "TTL": 300, "ResourceRecords":
+      [{"Value": "{{ cmx_mirth_connect_api_ingress_gateway_facts.resources[0].status.loadBalancer.ingress[0].hostname }}" }] }} ]}'
+
+# ingress.<env>.application.codametrix.com
+- name: Get Ingress Service facts
+  community.kubernetes.k8s_info:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    kind: Service
+    name: cmx-ingress-service
+    namespace: istio-system
+  register: cmx_ingress_service_facts
+
+# TODO: [DEVOPS-391] Switch to using the community.aws.route53 module
+- name: Create the route53 record for the CMX Ingress service
+  command: >
+    aws route53 change-resource-record-sets
+    --region "{{ region }}"
+    --hosted-zone-id "{{ application_hosted_zones.HostedZones[0].Id }}"
+    --change-batch '{"Changes":
+      [{"Action": "{{ 'UPSERT' if state == 'present' else 'DELETE' }}",
+      "ResourceRecordSet": {"Name": "{{ application_ingress_dns_address }}",
+      "Type": "CNAME", "TTL": 300, "ResourceRecords":
+      [{"Value": "{{ cmx_ingress_service_facts.resources[0].status.loadBalancer.ingress[0].hostname }}" }] }} ]}'

@@ -1,0 +1,79 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Pre provision bastion host(s) tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Apply preparatory configuration
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Configure the bastion host bastion keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_bastion_private_key }}"
+        aws_secret_private_key_path_var: "{{ bastion_host_bastion_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Create local files and configuration
+      import_role:
+        name: bastion
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure bastion host
+  hosts: bastion
+  gather_facts: false
+  vars:
+    state: present
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+
+    - name: Apply changes to bastion host
+      import_role:
+        name: bastion
+        tasks_from: configure-bastion.yml
+
+- name: Post provision bastion host tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Delete temporary private key file
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml

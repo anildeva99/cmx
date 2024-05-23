@@ -1,0 +1,14 @@
+case-builder-service        case-builder-service        1.0.0-SNAPSHOT
+claim-service               claim-service               1.0.0-SNAPSHOT
+configuration-service       configuration-service       1.0.0-SNAPSHOT
+dashboard-ui                dashboard-ui                latest
+dictionary-service          dictionary-service          1.0.0-SNAPSHOT
+documentation-service       documentation-service       1.0.0-SNAPSHOT
+event-dispatcher-service    event-dispatcher            1.0.0-SNAPSHOT
+importer-service	    importer-service            1.0.0-SNAPSHOT
+mirth	                    mirth                       1.0.0
+mu-sagemaker-service	    mu-sagemaker                0.0.1-SNAPSHOT
+order-service	            order-service               1.0.0-SNAPSHOT
+patient-service	            patient-service             1.0.0-SNAPSHOT
+process-service	            process-service             1.0.0-SNAPSHOT
+user-service	            user-service                1.0.0-SNAPSHOT

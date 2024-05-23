@@ -1,0 +1,38 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Run all playbooks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+
+# Provision and configure environment
+- name: Import provision-environment.yml
+  import_playbook: provision-environment.yml
+- name: Import configure-bastions.yml
+  import_playbook: configure-bastions.yml
+- name: Import prepare-mirth-databases.yml
+  import_playbook: prepare-mirth-databases.yml
+
+# Configure mirth
+- name: Import configure-mirth.yml
+  import_playbook: configure-mirth.yml
+
+# Configure customer networking (VPN tunnels)
+- name: Import prepare-customer-networking.yml
+  import_playbook: prepare-customer-networking.yml

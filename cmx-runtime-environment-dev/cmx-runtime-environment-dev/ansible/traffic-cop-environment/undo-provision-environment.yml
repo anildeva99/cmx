@@ -1,0 +1,50 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Unprovision environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: locals.yml
+
+    - name: Configure keypair secrets
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: configure-keypair-terraform.yml
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+    - name: Configure the environment
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: configure-environment.yml

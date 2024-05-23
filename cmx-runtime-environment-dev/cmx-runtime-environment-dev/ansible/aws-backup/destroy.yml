@@ -1,0 +1,19 @@
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+  tags: ['always']
+
+- name: Destroy AWS Backup config
+  hosts: local
+  connection: local
+  vars:
+    state: absent
+  tasks:
+    - name: Include configure-aws-backup role
+      include_role:
+        name: configure-aws-backup
+  tags: ['configure-aws-backup']

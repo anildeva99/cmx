@@ -1,0 +1,23 @@
+# Peering connections for the onboarding environment
+
+application_peer_vpc_routes:
+  - pcx_name: DataCentral1-CMXOnboardingApplication # Data Central 1 <-> Onboarding Application
+    destination_cidr: 10.71.0.0/16
+  - pcx_name: CMXOnboardingApp-CMXOnboardingIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.54.0.0/16
+  - pcx_name: ToolsNet-CMXOnboarding # Tools Network <-> Onboarding
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: ACTProduction-CMXOnboardingApplication
+    destination_cidr: 10.1.0.0/16
+
+ingress_peer_vpc_routes:
+  - pcx_name: CMXOnboardingIngress-CMXStage1Ingress # Onboarding Ingress -> Stage 1 Ingress
+    destination_cidr: 10.58.0.0/16
+  - pcx_name: CMXOnboardingApp-CMXOnboardingIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.53.0.0/16
+  - pcx_name: CMXOnboardingIngress-CMXProductionIngress # Onboarding Ingress -> Production Ingress
+    destination_cidr: 10.60.0.0/16
+  - pcx_name: CMXOnboardingIngress-CMXProdDRIngress # Onboarding Ingress -> ProdDR Ingress
+    destination_cidr: 10.66.0.0/16
+  - pcx_name: ToolsNet-CMXOnboardingIngress # Tools Network <-> Onboarding Ingress
+    destination_cidr: "{{ codametrix_tools_cidr }}"

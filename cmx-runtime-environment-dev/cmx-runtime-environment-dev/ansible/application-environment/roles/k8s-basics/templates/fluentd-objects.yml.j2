@@ -1,0 +1,208 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-logging
+  labels:
+    istio-injection: disabled
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd
+  namespace: kube-logging
+  labels:
+    app: fluentd
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluentd
+  labels:
+    app: fluentd
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fluentd
+roleRef:
+  kind: ClusterRole
+  name: fluentd
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: fluentd
+    namespace: kube-logging
+
+# !!! Disabling elasticsearch authentication for now...
+{# ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-configmap
+  namespace: kube-logging
+data:
+  fluent.conf: |-
+    @include "#{ENV['FLUENTD_SYSTEMD_CONF'] || 'systemd'}.conf"
+    @include "#{ENV['FLUENTD_PROMETHEUS_CONF'] || 'prometheus'}.conf"
+    @include kubernetes.conf
+    @include conf.d/*.conf
+
+  kubernetes.conf: |-
+    <match **>
+      @type "aws-elasticsearch-service"
+      @id out_aws_es
+      @log_level info
+      include_tag_key true
+      tag_key "@log_name"
+      ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+      ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1'}"
+      reload_connections "#{ENV['FLUENT_ELASTICSEARCH_RELOAD_CONNECTIONS'] || 'false'}"
+      reconnect_on_error "#{ENV['FLUENT_ELASTICSEARCH_RECONNECT_ON_ERROR'] || 'true'}"
+      reload_on_failure "#{ENV['FLUENT_ELASTICSEARCH_RELOAD_ON_FAILURE'] || 'true'}"
+      log_es_400_reason "#{ENV['FLUENT_ELASTICSEARCH_LOG_ES_400_REASON'] || 'false'}"
+      logstash_prefix "#{ENV['FLUENT_ELASTICSEARCH_LOGSTASH_PREFIX'] || 'logstash'}"
+      logstash_format "#{ENV['FLUENT_ELASTICSEARCH_LOGSTASH_FORMAT'] || 'true'}"
+      index_name "#{ENV['FLUENT_ELASTICSEARCH_LOGSTASH_INDEX_NAME'] || 'logstash'}"
+      type_name "#{ENV['FLUENT_ELASTICSEARCH_LOGSTASH_TYPE_NAME'] || 'fluentd'}"
+
+      <buffer>
+        flush_thread_count "#{ENV['FLUENT_ELASTICSEARCH_BUFFER_FLUSH_THREAD_COUNT'] || '8'}"
+        flush_interval "#{ENV['FLUENT_ELASTICSEARCH_BUFFER_FLUSH_INTERVAL'] || '5s'}"
+        chunk_limit_size "#{ENV['FLUENT_ELASTICSEARCH_BUFFER_CHUNK_LIMIT_SIZE'] || '2M'}"
+        queue_limit_length "#{ENV['FLUENT_ELASTICSEARCH_BUFFER_QUEUE_LIMIT_LENGTH'] || '32'}"
+        retry_max_interval "#{ENV['FLUENT_ELASTICSEARCH_BUFFER_RETRY_MAX_INTERVAL'] || '30'}"
+        retry_forever true
+      </buffer>
+
+      <endpoint>
+        url "https://#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+        region  {{ region }}
+      </endpoint>
+    </match>
+
+  Gemfile: |-
+    source "https://rubygems.org"
+    gem "fluentd", "1.7.1"
+    gem "oj", "3.8.1"
+    gem "fluent-plugin-multi-format-parser", "~> 1.0.0"
+    gem "fluent-plugin-concat", "~> 2.3.0"
+    gem "fluent-plugin-grok-parser", "~> 2.5.0"
+    gem "fluent-plugin-prometheus", "~> 1.5.0"
+    gem 'fluent-plugin-json-in-json-2', ">= 1.0.2"
+    gem "fluent-plugin-record-modifier", "~> 2.0.0"
+    gem "fluent-plugin-rewrite-tag-filter", "~> 2.2.0"
+    gem "elasticsearch", "~> 7.0"
+    gem "fluent-plugin-elasticsearch", "~> 3.5.5"
+    gem "fluent-plugin-detect-exceptions", "~> 0.0.12"
+    gem "fluent-plugin-kubernetes_metadata_filter", "~> 2.3.0"
+    gem "ffi"
+    gem "fluent-plugin-systemd", "~> 1.0.1"
+    gem "fluent-plugin-aws-elasticsearch-service" #}
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: kube-logging
+  labels:
+    app: fluentd
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+      annotations:
+        iam.amazonaws.com/role: "{{ fluentd_role }}"
+    spec:
+      serviceAccount: fluentd
+      serviceAccountName: fluentd
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+      - name: fluentd
+        image: fluent/fluentd-kubernetes-daemonset:v1.7.1-debian-elasticsearch7-1.1
+
+        # !!! Disabling elasticsearch authentication for now...
+        {# command: ["/bin/sh"]
+        args: ["-c", "gem install 'fluent-plugin-aws-elasticsearch-service'; rm /fluentd/etc/fluent.conf; cp /fluentd/etc/fluent-cmx.conf /fluentd/etc/fluent.conf; tini -- /fluentd/entrypoint.sh"] #}
+
+        env:
+          - name: TINI_SUBREAPER
+            value: "1"
+          - name: FLUENT_ELASTICSEARCH_HOST
+            value: "{{ fluentd_elasticsearch_host }}"
+          - name: FLUENT_ELASTICSEARCH_PORT
+            value: "443"
+          - name: FLUENT_ELASTICSEARCH_SCHEME
+            value: "https"
+          - name: FLUENTD_SYSTEMD_CONF
+            value: disable
+          - name: FLUENT_ELASTICSEARCH_BUFFER_FLUSH_THREAD_COUNT
+            value: "{{ fluentd_buffer_flush_thread_count }}"
+          - name: FLUENT_ELASTICSEARCH_BUFFER_QUEUE_LIMIT_LENGTH
+            value: "{{ fluentd_buffer_queue_limit_length }}"
+          - name: FLUENT_ELASTICSEARCH_BUFFER_CHUNK_LIMIT_SIZE
+            value: "{{ fluentd_buffer_chunk_limit_size }}"
+          - name: FLUENT_ELASTICSEARCH_BUFFER_FLUSH_INTERVAL
+            value: "{{ fluentd_buffer_flush_interval }}"
+
+            # Disable SSL verification since we will be pointing out elasticsearch.<env>.application.codametrix.com,
+            # rather than the hostname for the cert generated by AWS
+          - name: FLUENT_ELASTICSEARCH_SSL_VERIFY
+            value: "false"
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 1
+            memory: 1Gi
+        volumeMounts:
+          - name: varlog
+            mountPath: /var/log
+          - name: varlibdockercontainers
+            mountPath: /var/lib/docker/containers
+            readOnly: true
+
+          # !!! Disabling elasticsearch authentication for now...
+          {# - name: fluentd
+            mountPath: /fluentd/etc/fluent-cmx.conf
+            subPath: fluent.conf
+          - name: fluentd
+            mountPath: /fluentd/etc/kubernetes.conf
+            subPath: kubernetes.conf
+          - name: fluentd
+            mountPath: /fluentd/Gemfile
+            subPath: Gemfile #}
+
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+
+        # !!! Disabling elasticsearch authentication for now...
+        {# - name: fluentd
+          configMap:
+            name: fluentd-configmap #}

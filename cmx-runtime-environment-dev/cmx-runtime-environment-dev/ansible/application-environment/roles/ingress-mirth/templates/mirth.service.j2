@@ -1,0 +1,22 @@
+[Unit]
+Description=Mirth Service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=0
+User=ubuntu
+ExecStartPre=/usr/local/bin/cmx-mirth-init.sh
+ExecStart=/usr/bin/env docker run --rm --name mirth --mount type=bind,source=/etc/mirth/mirth.properties,target=/opt/mirth-connect/conf/mirth.properties \
+       --mount type=bind,source=/etc/mirth/configurationMap.properties,target=/opt/mirth-connect/appdata/configurationMap.properties \
+       --mount type=bind,source=/etc/mirth/ErrorLookup.properties,target=/opt/mirth-connect/custom-lib/ErrorLookup.properties \
+       --mount type=bind,source=/etc/mirth/HttpStatusLookup.properties,target=/opt/mirth-connect/custom-lib/HttpStatusLookup.properties \
+       --network="host" cmx-mirth-standalone:{{ image_versions.cmx_ingress_mirth }} \
+       /cmx-mirth.sh java -Xms{{ ingress_mirth_min_heap_size }} -Xmx{{ ingress_mirth_max_heap_size }} -jar mirth-server-launcher.jar
+ExecStop=/usr/bin/env docker kill mirth && /usr/bin/env docker rm mirth
+
+[Install]
+WantedBy=multi-user.target

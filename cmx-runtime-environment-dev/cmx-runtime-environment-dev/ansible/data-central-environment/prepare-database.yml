@@ -1,0 +1,84 @@
+---
+- name: Generate local configurations for environment databases
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Gather facts about the Dundas application database
+      community.aws.rds_instance_info:
+        filters:
+          "db-instance-id": "{{ dundas_application_database_identifier }}"
+        region: "{{ region }}"
+      register: dundas_application_database_facts
+
+    - name: Gather facts about the Dundas warehouse database
+      community.aws.rds_instance_info:
+        filters:
+          "db-instance-id": "{{ dundas_warehouse_database_identifier }}"
+        region: "{{ region }}"
+      register: dundas_warehouse_database_facts
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: "Create temporary private key file for
+        bastion host ubuntu user with permissions"
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure the database itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Prep the database users for use by Dundas
+      vars:
+        dundas_database_address: "{{ hostvars['localhost']['dundas_application_database_facts'].instances[0].endpoint.address }}"
+        dundas_warehouse_database_address: "{{ hostvars['localhost']['dundas_warehouse_database_facts'].instances[0].endpoint.address }}"
+        dundas_database_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixDataCentral/Dundas/ApplicationDatabase/' + env + '-' + dundas_application_database_admin_username,
+          region=region) }}"
+        dundas_warehouse_database_credentials: "{{ lookup('aws_secret',
+          'CodaMetrixDataCentral/Dundas/WarehouseDatabase/' + env + '-' + dundas_warehouse_database_admin_username,
+          region=region) }}"
+      import_role:
+        name: database
+        tasks_from: configure-dundas-db.yml
+
+- name: Perform cleanup tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: delete-temporary-key-file.yml

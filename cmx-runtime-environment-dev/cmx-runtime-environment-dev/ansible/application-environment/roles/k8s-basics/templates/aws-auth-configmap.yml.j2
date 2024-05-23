@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-auth
+  namespace: kube-system
+data:
+  mapRoles: |
+    - rolearn: arn:aws:iam::{{ aws_account_id }}:role/{{ worker_node_role_name }}
+      username: system:node:{% raw %}{{EC2PrivateDNSName}}{% endraw %}
+
+      groups:
+        - system:bootstrappers
+        - system:nodes
+
+    # Enable SSO admins to act as K8S system masters
+    - rolearn: arn:aws:iam::{{ aws_account_id }}:role/CMXOps-{{ aws_account_name }}-administrator_role
+      username: cmxops-{{ env }}-admin
+      groups:
+        - system:masters
+
+    # Enable developers to act as K8S system masters
+    - rolearn: arn:aws:iam::{{ aws_account_id }}:role/CMXApplication-{{ env }}-application_developer_role
+      username: cmxapp-{{ env }}-developer
+      groups:
+        - system:masters
+
+    # Enable EKS users to act as K8S system masters
+    - rolearn: arn:aws:iam::{{ aws_account_id }}:role/CMXApplication-{{ env }}-application_eks_user_role
+      username: cmxapp-{{ env }}-eks_user
+      groups:
+        - system:masters
+
+{% if ops_roles is defined  %}
+{% for ops_role in ops_roles %}
+    - rolearn: "{{ ops_role.rolearn }}"
+      username: "{{ ops_role.username }}"
+      groups:
+        - "{{ ops_role.group }}"
+{% endfor %}
+{% endif %}
+
+  mapUsers: |
+{% if ops_users is defined  %}
+{% for ops_user in ops_users %}
+    - userarn: "{{ ops_user.userarn }}"
+      username: "{{ ops_user.username }}"
+      groups:
+        - "{{ ops_user.group }}"
+{% endfor %}
+{% endif %}
+
+# ... Apply additional role / user mappings ...

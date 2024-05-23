@@ -1,0 +1,57 @@
+# Customer specific stuff!
+
+# Enable Cisco CSRs for customer customer networking ?
+enable_customer_networking: false
+customer_networking_instance_type: t2.medium
+
+# Customer VPN AMIs (Cisco Cloud Services Router (CSR) 1000V - Security Pkg. Max Performance)
+customer_networking_amis:
+  us-east-1: ami-0c191b50cddbbae59
+
+###################################################
+#  Traffic from Application mirth to Ingress mirth
+###################################################
+# Partners: 20000 - 20049
+# CU Medicine: 20050 - 20099
+app_mirth_to_ingress_mirth_open_ports:
+  - 20000 # Partners ORU
+  - 20001 # Note! Skip this port, it is used by Kiali
+  - 20002 # Partners DFT
+  - 20050 # CU Medicine ORU
+  - 20051 # CU Medicine DFT
+
+###################################################
+#  Traffic from other places to Ingress mirth
+###################################################
+ingress_mirth_additional_open_ports:
+  - 21000 # Test Port
+  - 21001 # Test Port
+  - 21002 # Test Port
+  - 21003 # Test Port
+  - 21004 # Test Port
+  - 21005 # Test Port
+  - 21006 # Test Port
+  - 21007 # Test Port
+  - 21008 # Test Port
+  - 21009 # Test Port
+
+##########
+# Partners
+##########
+partners_ingress_open_ports:
+  - 30000 # MGPO ADT (Prelude ADT [PDR] to CMX)
+  - 30001 # MGPO Results (Radiant ORU [PDR] to CMX)
+  - 30002 # MGPO CAC (CMX ORU to CAC [PDR])
+  - 30201 # MGPO Feedback (DFT [ICM] to CMX)
+  - 30202 # MGPO Billing (CMX DFT to Billing [ICM])
+
+partners_vpn_secret_recovery_window_days: 30
+
+#############
+# CU Medicine
+#############
+cumedicine_ingress_open_ports:
+  - 31001 # ADT (Admission/Discharge/Transfer)
+  - 31002 # ORU (Radiology Orders)
+
+cumedicine_vpn_secret_recovery_window_days: 30

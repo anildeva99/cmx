@@ -1,0 +1,5 @@
+---
+- name: Delete temporary key file
+  file:
+    path: "{{ localhost_temporary_key_path_var }}"
+    state: absent

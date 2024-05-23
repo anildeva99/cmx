@@ -1,0 +1,683 @@
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+  namespace: istio-system
+spec:
+  acme:
+    # The ACME server URL
+    server: {{ letsencrypt_environment_server }}
+    # Email address used for ACME registration
+    email: {{ letsencrypt_notification_email }}
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-secret
+    # Enable DNS01 validations
+    solvers:
+      - dns01:
+          route53:
+            region: "{{ region }}"
+
+# This certificate handles SSL for constellation-gateway below, so SSL is terminated both at the LB and within K8S.
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: ingress-gw-cert
+  namespace: istio-system
+spec:
+  secretName: ingress-gw-cert
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  acme:
+    config:
+      - dns01:
+          provider: route53
+        domains:
+        - "{{ application_ingress_dns_address }}"
+  commonName: "{{ application_ingress_dns_address }}"
+  dnsNames:
+  - "{{ application_ingress_dns_address }}"
+
+# This service creates a load balancer which redirects HTTPS traffice to istio-ingressgateway. The Ingress ALB below
+# redirects traffic to this service.
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cmx-ingress-service
+  namespace: istio-system
+  labels:
+    app: cmx-ingress-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Name=cmx-ingress-service,Network=application,Environment={{ env }},Usage={{ shared_resource_tags.Usage }}"
+spec:
+  externalTrafficPolicy: Cluster
+  type: LoadBalancer
+  selector:
+    app: istio-ingressgateway
+    istio: ingressgateway
+  ports:
+  - protocol: TCP
+    name: https-api
+    port: 443
+    targetPort: 443
+  - protocol: TCP
+    name: tcp-mirthapi
+    port: {{ service_ports.cmx_mirth }}
+    targetPort: {{ service_ports.cmx_mirth }}
+  - protocol: TCP
+    name: tcp-ssh
+    port: {{ service_ports.cmx_cluster_bastion }}
+    targetPort: {{ service_ports.cmx_cluster_bastion }}
+
+# This ingress creates an application (HTTP/HTTPS) load balancer which redirects to the cmx-ingress-service above.
+# It handles HTTP -> HTTPS redirects and SSL termination using an ACM certificate generated in terraform.
+# This is the customer-facing, CMX Automate ingress
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: cmx-automate-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/certificate-arn: "{{ cmx_automate_certificate_info.certificates[0].certificate_arn }}"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/tags: "Name=cmx-automate-ingress,Network=application,Environment={{ env }},Usage={{ shared_resource_tags.Usage }}"
+    alb.ingress.kubernetes.io/security-groups: "{{ cmx_automate_ingress_sg.security_groups[0].group_id }}"
+    alb.ingress.kubernetes.io/waf-acl-id: "{{ regional_web_acl.wafs[0]['web_acl_id'] }}"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+
+# Should our application load balancer be internally or externally facing?
+{% if cmx_automate_ingress_lb_internal %}
+    alb.ingress.kubernetes.io/scheme: internal
+{% else %}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+{% endif %}
+  labels:
+    app: cmx-automate-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /*
+            backend:
+              serviceName: ssl-redirect
+              servicePort: use-annotation
+          - path: /*
+            backend:
+              serviceName: cmx-ingress-service
+              servicePort: 443
+
+# This ingress creates an application (HTTP/HTTPS) load balancer which redirects to the cmx-ingress-service above.
+# It handles HTTP -> HTTPS redirects and SSL termination using an ACM certificate generated in terraform.
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: cmx-api-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/certificate-arn: "{{ api_gateway_certificate_info.certificates[0].certificate_arn }}"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/tags: "Name=cmx-api-ingress,Network=application,Environment={{ env }},Usage={{ shared_resource_tags.Usage }}"
+    alb.ingress.kubernetes.io/security-groups: "{{ cmx_api_ingress_sg.security_groups[0].group_id }}"
+    alb.ingress.kubernetes.io/waf-acl-id: "{{ regional_web_acl.wafs[0]['web_acl_id'] }}"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+
+# Should our application load balancer be internally or externally facing?
+{% if cmx_api_ingress_lb_internal %}
+    alb.ingress.kubernetes.io/scheme: internal
+{% else %}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+{% endif %}
+  labels:
+    app: cmx-api-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /*
+            backend:
+              serviceName: ssl-redirect
+              servicePort: use-annotation
+          - path: /*
+            backend:
+              serviceName: cmx-ingress-service
+              servicePort: 443
+# Ingress used to whitelist specific IP addresses for external access to cmx app
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: cmx-api-public-whitelist-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/certificate-arn: "{{ api_gateway_certificate_info.certificates[0].certificate_arn }}"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/tags: "Name=cmx-api-public-whitelist-ingress,Network=application,Environment={{ env }},Usage={{ shared_resource_tags.Usage }}"
+    alb.ingress.kubernetes.io/security-groups: "{{ cmx_api_public_whitelist_ingress_sg.security_groups[0].group_id }}"
+    alb.ingress.kubernetes.io/waf-acl-id: "{{ regional_web_acl.wafs[0]['web_acl_id'] }}"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+  labels:
+    app: cmx-api-public-whitelist-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /*
+            backend:
+              serviceName: ssl-redirect
+              servicePort: use-annotation
+          - path: /*
+            backend:
+              serviceName: cmx-ingress-service
+              servicePort: 443
+
+# This ingress creates an application (HTTP/HTTPS) load balancer which redirects to the cmx-ingress-service service above.
+# It handles HTTP -> HTTPS redirects and SSL termination using an ACM certificate generated in terraform.
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: cmx-mirth-connect-api-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/certificate-arn: "{{ mirth_connect_api_gateway_certificate_info.certificates[0].certificate_arn }}"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":{{ service_ports.cmx_mirth }}}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "{{ service_ports.cmx_mirth }}", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/tags: "Name=cmx-mirth-connect-api-ingress,Network=application,Environment={{ env }},Usage={{ shared_resource_tags.Usage }}"
+    alb.ingress.kubernetes.io/security-groups: "{{ cmx_application_mirth_connect_api_ingress_sg.security_groups[0].group_id }}"
+    # Certain WAF rules (XSS, restrict sizes) cause problems for Mirth, disabling for now.
+    #alb.ingress.kubernetes.io/waf-acl-id: "{{ regional_web_acl.wafs[0]['web_acl_id'] }}"
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+  labels:
+    app: cmx-mirth-connect-api-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /*
+            backend:
+              serviceName: ssl-redirect
+              servicePort: use-annotation
+          - path: /*
+            backend:
+              serviceName: cmx-ingress-service
+              servicePort: {{ service_ports.cmx_mirth }}
+
+{% if create_dundas_service_entry %}
+# This service entry enables Dundas to be seen as another in-cluster service
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: dundas
+spec:
+  hosts:
+    - "{{ dundas_address }}"
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+# Enable simple TLS for Dundas
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: dundas-destination-rule
+spec:
+  host: "{{ dundas_address }}"
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+{% endif %}
+
+# This gateway handles SSH traffic to the cluster bastion and HTTPS traffic to the constellation services.
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: constellation-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway # use istio default controller
+  servers:
+    - port:
+        number: {{ service_ports.cmx_cluster_bastion }}
+        name: ssh
+        protocol: TCP
+      hosts:
+        - "*"
+    - port:
+        number: {{ service_ports.cmx_mirth }}
+        name: tcp-mirthapi
+        protocol: TCP # Just using TCP for this, Mirth terminates TLS itself
+      hosts:
+        - "*"
+    - port:
+        number: 443
+        name: https-api
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: ingress-gw-cert
+        serverCertificate: sds
+        privateKey: sds
+      hosts:
+        - "*"
+
+# This virtual service handles SSH traffic to the cluster bastion
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: cluster-bastion
+  namespace: istio-system
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - constellation-gateway
+  tcp:
+    - match:
+        - port: {{ service_ports.cmx_cluster_bastion }}
+      route:
+        - destination:
+            host: cluster-bastion.codametrix.svc.cluster.local
+            port:
+              number: {{ service_ports.cmx_cluster_bastion }}
+
+# This virtual service handles Mirth Connect Administrator traffic to Mirth
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: mirth
+  namespace: istio-system
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - constellation-gateway
+  tcp:
+    - match:
+        - port: {{ service_ports.cmx_mirth }}
+      route:
+        - destination:
+            host: mirth.codametrix.svc.cluster.local
+            port:
+              number: {{ service_ports.cmx_mirth }}
+
+
+# This virtual service handles HTTPS traffic to the constellation services
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: constellation-virtual-service
+  namespace: istio-system
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - constellation-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/{{ security_check_url_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ login_url_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ logout_url_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ organization_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ user_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ contexts_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ role_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ dundas_credential_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ dundas_token_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ user_config_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ case_instance_url_path_prefix}}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ case_builder_filter_url_path_prefix}}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ case_builder_metadata_source_url_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ case_builder_metadata_association_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ case_builder_metadata_definition_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ process_instance_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ primary_assigning_authority_url_path_prefix}}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ hl7_oru_r01_import_url_path}}"  # Need this open for Mirth to talk to the application
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_importer_service }}
+        host: importer-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ hl7_adt_ax_import_url_path_prefix }}"  # Need this open for ADT messages from Mirth
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_importer_service }}
+        host: importer-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ hl7_dft_px_import_url_path_prefix }}"  # Need this open for DFT messages from Mirth
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_importer_service }}
+        host: importer-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ codes_description_list_url_path }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ dictionary_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/v2/{{ dictionary_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ dictionary_cpt_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/v2/{{ dictionary_cpt_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ dictionary_modifier_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/v2/{{ dictionary_modifier_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dictionary_service }}
+        host: dictionary-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ document_import_url_path }}"  # Need this open for Documentation import from Mirth
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_documentation_service }}
+        host: documentation-service.codametrix.svc.cluster.local
+{% if env in test_api_enabled_environments %}  # Apis that are environment specific
+  - match:
+    - uri:
+        prefix: "/{{ orders_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_order_service }}
+        host: order-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ patient_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_patient_service }}
+        host: patient-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ encounter_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_patient_service }}
+        host: patient-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ documents_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_documentation_service }}
+        host: documentation-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ userpreference_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ configuration_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_configuration_service }}
+        host: configuration-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ resource_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ tenant_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_user_service }}
+        host: user-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ destination_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_exporter_service }}
+        host: exporter-service.codametrix.svc.cluster.local
+  - match:
+    - uri:
+        prefix: "/{{ export_url_path_prefix }}"
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_exporter_service }}
+        host: exporter-service.codametrix.svc.cluster.local
+{% endif %}
+
+{% if create_dundas_service_entry %}
+  # Dundas service provided by service entry above
+  - match:
+    - uri:
+        prefix: /dundasbi
+    route:
+    - destination:
+        host: "{{ dundas_address }}"
+{% endif %}
+
+  - route: # Fall-through route to the Dashboard UI
+    - destination:
+        port:
+          number: {{ service_ports.cmx_dashboard_ui }}
+        host: dashboard-ui.codametrix.svc.cluster.local
+
+  # The example below is just that, in case we need an example of URI rewriting (would rewrite /case to /)
+  {# - match:
+    - uri:
+        prefix: "/{{ case_url_path_prefix }}"
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        port:
+          number: {{ service_ports.cmx_case_builder_service }}
+        host: case-builder-service.codametrix.svc.cluster.local #}

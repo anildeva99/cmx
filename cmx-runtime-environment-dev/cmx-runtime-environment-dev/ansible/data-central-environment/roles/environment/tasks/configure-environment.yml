@@ -1,0 +1,98 @@
+---
+- name: Terraform block
+  block:
+    - name: "Set environment state to {{ state }}"
+      community.general.terraform:
+        force_init: "{{ force_init }}"
+        project_path: "{{ terraform_path }}"
+        state: "{{ state }}"
+        variables_file: terraform.tfvars
+      register: environment_terraform
+  rescue:
+    - name: Terraform failed with the following error(s)
+      fail:
+        msg: "{{ environment_terraform.msg.split('\n') }}"
+
+# ! Note: Now we rotate the DB master passwords and JWT
+# ! key as they are set by terraform so whatever password
+# ! is used there will be stored in terraform state.
+
+- name: Gather facts about the Dundas application database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ dundas_application_database_identifier }}"
+    region: "{{ region }}"
+  register: dundas_application_database_facts
+
+- name: Gather facts about the Dundas warehouse database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ dundas_warehouse_database_identifier }}"
+    region: "{{ region }}"
+  register: dundas_warehouse_database_facts
+
+# TODO: [DEVOPS-388] Replace ansible pause with until loop
+- name: Pause for 2 minutes to allow existing DB modify operations to finish
+  pause:
+    minutes: 2
+
+- name: Generate passwords to use for rotation.
+  set_fact:
+    dundas_db_master_password: "{{ lookup('randpass', '32', uppercase=10,
+      lowercase=10, digits=10) }}"
+    dundas_warehouse_master_password: "{{ lookup('randpass', '32',
+      uppercase=10, lowercase=10, digits=10) }}"
+
+- name: Rotate Dundas application DB password to one not in TF state
+  command: >
+    aws rds modify-db-instance --region "{{ region }}"
+    --db-instance-identifier "{{ dundas_application_database_identifier }}"
+    --master-user-password "{{ dundas_db_master_password }}"
+  when: (state == "present")
+
+  # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Update secret for the Dundas application DB credentials
+  vars:
+    address: "{{ dundas_application_database_facts.instances[0].endpoint.address }}"
+    db_name: "{{ dundas_application_database_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ dundas_application_database_admin_username }}",
+      "dbpassword":"{{ dundas_db_master_password }}",
+      "dburl":"jdbc:postgresql://{{ url }}",
+      "dbaddress":"{{ address }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ dundas_secrets_kms_key_alias }}"
+    name: "CodaMetrixDataCentral/Dundas/ApplicationDatabase/{{ env }}-{{ dundas_application_database_admin_username }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"
+  when: (state == "present")
+
+- name: Rotate Dundas warehouse DB password to one not in TF state
+  command: >
+    aws rds modify-db-instance --region "{{ region }}"
+    --db-instance-identifier "{{ dundas_warehouse_database_identifier }}"
+    --master-user-password "{{ dundas_warehouse_master_password }}"
+  when: (state == "present")
+
+  # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Update secret for the Dundas warehouse DB credentials
+  vars:
+    address: "{{ dundas_warehouse_database_facts.instances[0].endpoint.address }}"
+    db_name: "{{ dundas_warehouse_database_name }}"
+    params: "ssl=true&sslmode=require"
+    url: "{{ address }}/{{ db_name }}?{{ params }}"
+    secret: '{"dbusername":"{{ dundas_warehouse_database_admin_username }}",
+      "dbpassword":"{{ dundas_warehouse_master_password }}",
+      "dburl":"jdbc:postgresql://{{ url }}",
+      "dbaddress":"{{ address }}"}'
+  community.aws.aws_secret:
+    kms_key_id: "{{ dundas_secrets_kms_key_alias }}"
+    name: "CodaMetrixDataCentral/Dundas/WarehouseDatabase/{{ env }}-{{ dundas_warehouse_database_admin_username }}"
+    region: "{{ region }}"
+    secret_type: 'string'
+    secret: "{{ secret|string }}"
+    state: "{{ state }}"
+  when: (state == "present")

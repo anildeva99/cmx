@@ -1,0 +1,29 @@
+---
+- name: Clone cmx-deploy-config repo
+  git:
+    accept_hostkey: true
+    depth: 1
+    dest: "{{ temp_directory }}/cmx-deploy-config"
+    repo: git@github.com:CodaMetrix/cmx-deploy-config.git
+    version: "{{ deploy_config_branch }}"
+
+- name: Parse Service version(s)
+  vars:
+    file: "service-versions-{{ env }}.yml"
+  set_fact:
+    image_versions: "{{ lookup('file',
+      '{{ temp_directory }}/cmx-deploy-config/{{ file }}')|from_yaml }}"
+
+- name: Remove cmx-deploy-config repo
+  file:
+    path: "{{ temp_directory }}/cmx-deploy-config"
+    state: absent
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Set cluster bastion resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'clusterbastion.yml.j2') }}"
+    state: "{{ state }}"
+  when: (enable_cluster_bastion)

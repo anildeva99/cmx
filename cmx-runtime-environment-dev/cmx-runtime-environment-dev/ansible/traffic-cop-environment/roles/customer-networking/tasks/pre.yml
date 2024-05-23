@@ -1,0 +1,41 @@
+---
+- name: Add Customer Router 1 host to the in-memory inventory
+  add_host:
+    ansible_authorize: true
+    ansible_become_method: enable
+    ansible_become: true
+    ansible_connection: network_cli
+    ansible_host: "customerrouter-1-private.{{ env }}.trafficcop.codametrix.com"
+    ansible_network_os: ios
+    ansible_port: 22
+    #ansible_python_interpreter: /usr/bin/python2
+    ansible_ssh_private_key_file: "{{ customerrouter_private_key_path }}"
+    ansible_user: "{{ customerrouter_login_username }}"
+    group: customerrouters
+    name: "customerrouter-1-private.{{ env }}.trafficcop.codametrix.com"
+
+- name: Gather info about the Customer Router 1 private ENI
+  amazon.aws.ec2_eni_info:
+    filters:
+      "tag:Environment": "{{ env }}"
+      "tag:Type": customerrouter_1_private_interface
+    region: "{{ region }}"
+  register: cmx_customerrouter_1_private_eni_facts
+
+- name: Retrieve Pre-shared Key from Partners VPN secret
+  set_fact:
+    partners_vpn_tunnel_preshared_key: "{{ lookup('aws_secret',
+      'CMXTrafficCop/CustomerVPN/' + env + '-partners',
+      region=region) }}"
+
+- name: Retrieve Pre-shared Key from CU Medicine VPN secret
+  set_fact:
+    cumedicine_vpn_tunnel_preshared_key: "{{ lookup('aws_secret',
+      'CMXTrafficCop/CustomerVPN/' + env + '-cumedicine',
+      region=region) }}"
+
+- name: Retrieve Pre-shared Key from Yale VPN secret
+  set_fact:
+    yale_vpn_tunnel_preshared_key: "{{ lookup('aws_secret',
+      'CMXTrafficCop/CustomerVPN/' + env + '-yale',
+      region=region) }}"

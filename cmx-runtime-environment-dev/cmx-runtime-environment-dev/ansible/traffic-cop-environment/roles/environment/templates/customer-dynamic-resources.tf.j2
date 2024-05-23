@@ -1,0 +1,97 @@
+##########
+# Partners
+
+# Partners routes back to the Customer Router
+{% for cidr_block in partners_route_cidr_blocks %}
+resource "aws_route" "private_route_customerrouter_1_partners_{{ cidr_block.index }}" {
+  route_table_id            = aws_route_table.private_route_table.id
+  destination_cidr_block    = "{{ cidr_block.cidr }}"
+  network_interface_id      = aws_network_interface.customerrouter_1_private_interface.id
+}
+{% endfor %}
+
+resource "aws_secretsmanager_secret" "partners_vpn_secret" {
+  name = "CMXTrafficCop/CustomerVPN/${var.environment}-partners"
+  description = "Secret for VPN connection with Partners"
+  kms_key_id = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.partners_vpn_secret_recovery_window_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "partners_vpn_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - partners_vpn_secret"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "partners_vpn_secret_version" {
+  secret_id = aws_secretsmanager_secret.partners_vpn_secret.id
+  secret_string = "abc123"
+}
+
+#############
+# CU Medicine
+#############
+
+# CU Medicine routes back to the Customer Router
+{% for cidr_block in cumedicine_route_cidr_blocks %}
+resource "aws_route" "private_route_customerrouter_1_cumedicine_{{ cidr_block.index }}" {
+  route_table_id            = aws_route_table.private_route_table.id
+  destination_cidr_block    = "{{ cidr_block.cidr }}"
+  network_interface_id      = aws_network_interface.customerrouter_1_private_interface.id
+}
+{% endfor %}
+
+resource "aws_secretsmanager_secret" "cumedicine_vpn_secret" {
+  name = "CMXTrafficCop/CustomerVPN/${var.environment}-cumedicine"
+  description = "Secret for VPN connection with CU Medicine"
+  kms_key_id = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.cumedicine_vpn_secret_recovery_window_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "cumedicine_vpn_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - cumedicine_vpn_secret"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "cumedicine_vpn_secret_version" {
+  secret_id = aws_secretsmanager_secret.cumedicine_vpn_secret.id
+  secret_string = "abc123"
+}
+
+########
+# Yale
+########
+
+# Yale routes back to the Customer Router
+{% for cidr_block in yale_route_cidr_blocks %}
+resource "aws_route" "private_route_customerrouter_1_yale_{{ cidr_block.index }}" {
+  route_table_id            = aws_route_table.private_route_table.id
+  destination_cidr_block    = "{{ cidr_block.cidr }}"
+  network_interface_id      = aws_network_interface.customerrouter_1_private_interface.id
+}
+{% endfor %}
+
+resource "aws_secretsmanager_secret" "yale_vpn_secret" {
+  name = "CMXTrafficCop/CustomerVPN/${var.environment}-yale"
+  description = "Secret for VPN connection with Yale"
+  kms_key_id = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.yale_vpn_secret_recovery_window_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "yale_vpn_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - yale_vpn_secret"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "yale_vpn_secret_version" {
+  secret_id = aws_secretsmanager_secret.yale_vpn_secret.id
+  secret_string = "abc123"
+}

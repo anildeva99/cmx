@@ -1,0 +1,303 @@
+####################
+# Environment basics
+####################
+aws_region                   = "{{ region }}"
+environment                  = "{{ env }}"
+environment_dns_name         = "{{ environment_dns_name }}"
+sso_login_account_id         = "{{ sso_login_account_id }}"
+
+peer_vpc_routes = {
+  {% for route in peer_vpc_routes %}
+    "{{ route.pcx_name }}" = {
+      "pcx_name" = "{{ route.pcx_name }}",
+      "destination_cidr" = "{{ route.destination_cidr }}"
+    },
+  {% endfor %}
+}
+
+shared_resource_tags = {
+  {% for key, value in shared_resource_tags.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+database_temporary_password  = "{{ database_temporary_password }}"
+
+iam_resource_path            = "/"
+
+environment_logs_bucket      = "{{ environment_logs_bucket }}"
+environment_secrets_kms_key_alias = "{{ environment_secrets_kms_key_alias }}"
+
+sns_topics = {
+  {% for key, value in sns_topics.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+###########
+# VPC Stuff
+###########
+vpc_cidr_block               = "{{ ip_range_prefix }}.0.0/16"
+vpc_subnet_cidr_block_prefix = "{{ ip_range_prefix }}"
+vpc_subnet_cidr_block_suffix = "0/24"
+
+###############
+# Dundas Stuff
+###############
+dundas_amis = {
+  {% for key, value in dundas_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+dundas_autoscaling_group = {
+  {% for key, value in dundas_autoscaling_group.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+dundas_instance_type = "{{ dundas_instance_type }}"
+dundas_config_secret_name = "{{ dundas_config_secret_name }}"
+
+dundas_key_name = "{{ dundas_key_name }}"
+dundas_keypair_public_key = "{{ dundas_keypair_public_key }}"
+dundas_instance_role  = "{{ dundas_instance_role }}"
+
+alb_dundas_ingress_from_cidr_sgs = [
+  {% for alb_dundas_ingress_from_cidr in alb_dundas_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ alb_dundas_ingress_from_cidr.description }}"
+      "from_port" = "{{ alb_dundas_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ alb_dundas_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ alb_dundas_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in alb_dundas_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+alb_dundas_ingress_from_sg_sgs = [
+  {% for alb_dundas_ingress_from_sg in alb_dundas_ingress_from_sg_sgs %}
+    {
+      {% for key, value in alb_dundas_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+dundas_application_database_identifier                       = "{{ dundas_application_database_identifier }}"
+dundas_application_database_name                             = "{{ dundas_application_database_name }}"
+dundas_application_database_admin_username                   = "{{ dundas_application_database_admin_username }}"
+dundas_application_database_username                         = "{{ dundas_application_database_username }}"
+dundas_application_database_size                             = {{ dundas_application_database_size }}
+dundas_application_database_version                          = "{{ dundas_application_database_version }}"
+dundas_application_database_instance_class                   = "{{ dundas_application_database_instance_class }}"
+dundas_application_database_backup_retention_period          = {{ dundas_application_database_backup_retention_period }}
+dundas_application_database_deletion_protection              = {{ dundas_application_database_deletion_protection|lower }}
+dundas_application_database_monitoring_interval              = {{ dundas_application_database_monitoring_interval }}
+dundas_application_database_subnet_group_name                = "{{ dundas_application_database_subnet_group_name }}"
+dundas_application_database_secret_recovery_window_days      = {{ dundas_application_database_secret_recovery_window_days }}
+
+dundas_ses_identity      = "{{ dundas_ses_identity }}"
+
+dundas_application_database_additional_ingress_sgs  = [
+  {% for item in dundas_application_database_additional_ingress_sgs %}
+  "{{ item }}",
+  {% endfor %}
+]
+
+dundas_application_database_enabled_cloudwatch_logs_exports  = [
+  {% for log_exports in dundas_application_database_enabled_cloudwatch_logs_exports %}
+  "{{ log_exports }}",
+  {% endfor %}
+]
+
+dundas_warehouse_database_identifier                       = "{{ dundas_warehouse_database_identifier }}"
+dundas_warehouse_database_name                             = "{{ dundas_warehouse_database_name }}"
+dundas_warehouse_database_admin_username                   = "{{ dundas_warehouse_database_admin_username }}"
+dundas_warehouse_database_username                         = "{{ dundas_warehouse_database_username }}"
+dundas_warehouse_database_size                             = {{ dundas_warehouse_database_size }}
+dundas_warehouse_database_version                          = "{{ dundas_warehouse_database_version }}"
+dundas_warehouse_database_instance_class                   = "{{ dundas_warehouse_database_instance_class }}"
+dundas_warehouse_database_backup_retention_period          = {{ dundas_warehouse_database_backup_retention_period }}
+dundas_warehouse_database_deletion_protection              = {{ dundas_warehouse_database_deletion_protection|lower }}
+dundas_warehouse_database_monitoring_interval              = {{ dundas_warehouse_database_monitoring_interval }}
+dundas_warehouse_database_subnet_group_name                = "{{ dundas_warehouse_database_subnet_group_name }}"
+dundas_warehouse_database_secret_recovery_window_days      = {{ dundas_warehouse_database_secret_recovery_window_days }}
+
+dundas_warehouse_database_additional_ingress_sgs  = [
+  {% for item in dundas_warehouse_database_additional_ingress_sgs %}
+  "{{ item }}",
+  {% endfor %}
+]
+
+dundas_warehouse_database_enabled_cloudwatch_logs_exports  = [
+  {% for log_exports in dundas_warehouse_database_enabled_cloudwatch_logs_exports %}
+  "{{ log_exports }}",
+  {% endfor %}
+]
+
+dundas_secrets_kms_key_alias = "{{ dundas_secrets_kms_key_alias }}"
+
+##############
+# Bastion host
+##############
+bastion_instance_type        = "{{ bastion_instance_type }}"
+bastion_host_key_name        = "{{ bastion_host_key_name }}"
+bastion_host_public_key      = "{{ bastion_host_keypair_public_key }}"
+bastion_amis = {
+  {% for key, value in bastion_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+bastion_ingress_from_cidr_sgs = [
+  {% for bastion_ingress_from_cidr in bastion_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ bastion_ingress_from_cidr.description }}"
+      "from_port" = "{{ bastion_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ bastion_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ bastion_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in bastion_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+bastion_ingress_from_sg_sgs = [
+  {% for bastion_ingress_from_sg in bastion_ingress_from_sg_sgs %}
+    {
+      {% for key, value in bastion_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+aws_secret_manager_secret_key_initial_value = "{{ aws_secret_manager_secret_key_initial_value }}"
+aws_secrets_recovery_window_in_days         = {{ aws_secrets_recovery_window_in_days }}
+cloud_watch_alarm_topic_display_name        = "{{ cloud_watch_alarm_topic_display_name }}"
+
+############
+# WAF Stuff
+############
+waf_regional_prefix = "regional"
+
+blacklisted_ips = [
+  {
+    value = "172.16.0.0/16"
+    type  = "IPV4"
+  },
+  {
+    value = "192.168.0.0/16"
+    type  = "IPV4"
+  },
+  {
+    value = "169.254.0.0/16"
+    type  = "IPV4"
+  },
+  {
+    value = "127.0.0.1/32"
+    type  = "IPV4"
+  },
+  # Disable blacklisted local IP addresses which is preventing access from the VPN
+  #{
+  #  value = "10.0.0.0/8"
+  #  type  = "IPV4"
+  #},
+]
+
+admin_remote_ipset = [
+  {
+    value = "127.0.0.1/32"
+    type  = "IPV4"
+  },
+]
+
+acl_constraint_body_size          = "{{ acl_constraint_body_size }}"
+acl_constraint_cookie_size        = "{{ acl_constraint_cookie_size }}"
+acl_constraint_query_string_size  =  "{{ acl_constraint_query_string_size }}"
+acl_constraint_uri_size           =  "{{ acl_constraint_uri_size }}"
+web_admin_url                     =  "{{ web_admin_url }}"
+acl_constraint_match_auth_tokens  = "{{ acl_constraint_match_auth_tokens }}"
+acl_constraint_session_id         = "{{ acl_constraint_session_id }}"
+
+##########################
+# Security Tool Related!
+##########################
+env_vpc_flow_log_group_name        = "{{ env_vpc_flow_log_group_name }}"
+env_vpc_flow_log_traffic_type      = "{{ env_vpc_flow_log_traffic_type }}"
+aws_inspector_enabled              = "{{ aws_inspector_enabled|lower }}"
+inspector_schedule_expression      = "{{ inspector_schedule_expression }}"
+inspector_assessment_duration      = "{{ inspector_assessment_duration }}"
+ruleset_cve                        = "{{ ruleset_cve|lower }}"
+ruleset_cis                        = "{{ ruleset_cis|lower }}"
+ruleset_security_best_practices    = "{{ ruleset_security_best_practices|lower }}"
+ruleset_network_reachability       = "{{ ruleset_network_reachability|lower }}"
+inspector_enable_scheduled_event   = "{{ inspector_enable_scheduled_event|lower }}"
+aws_inspector_ruleset_region       = "{{ aws_inspector_ruleset_region }}"
+aws_ruleset_account_id              = "{{ aws_ruleset_account_id }}"
+aws_ruleset_cve_id                 = "{{ aws_ruleset_cve_id }}"
+aws_ruleset_cis_id                 = "{{ aws_ruleset_cis_id }}"
+ruleset_security_best_practices_id = "{{ ruleset_security_best_practices_id }}"
+ruleset_network_reachability_id    = "{{ ruleset_network_reachability_id }}"
+
+guardduty_detector_enable = "{{ guardduty_detector_enable|lower }}"
+guardduty_master_account_id    = "{{ guardduty_master_account_id }}"
+
+aws_foundations_securityhub_standards_subscription_arn = "{{ aws_foundations_securityhub_standards_subscription_arn }}"
+aws_securityhub_product_subscription_arn               = "{{ aws_securityhub_product_subscription_arn }}"
+
+###################################################################
+#  CloudWatch Alarm -> SNS Topic -> User Email
+###################################################################
+free_storage_metrix_name = "{{ free_storage_metrix_name }}"
+percentage_disk_space_used_metrix_name = "{{percentage_disk_space_used_metrix_name }}"
+less_than_or_equal_to_comparison_operator = "{{ less_than_or_equal_to_comparison_operator }}"
+greater_than_comparison_operator = "{{ greater_than_comparison_operator }}"
+statistic_period = "{{ statistic_period }}"
+
+treat_missing_data   = {
+  {% for key, value in treat_missing_data.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+cloudwatch_alarm_namespace  = {
+  {% for key, value in cloudwatch_alarm_namespace.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+low_storage_space_cloudwatch_alarm  = {
+  {% for key, value in low_storage_space_cloudwatch_alarm.items() %}
+  "{{ key }}" = {
+      {% if value is mapping %}
+        {% for key1, value1 in value.items() %}
+          "{{ key1 }}" = {
+             {% for key2, value2 in value1.items() %}
+               "{{ key2 }}" = "{{ value2 }}"
+             {% endfor %}
+          }
+        {% endfor %}
+      {% endif %}
+   }
+  {% endfor %}
+}
+
+dundas_server_liveness_threshold = {{ dundas_server_liveness_threshold }}
+
+###################################################################
+#  End of CloudWatch Alarm -> SNS Topic -> User Email
+###################################################################
+
+###################################################################
+#  Enable KMS key rotation
+###################################################################
+enable_key_rotation = "{{ enable_key_rotation|lower }}"

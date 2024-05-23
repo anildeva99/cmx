@@ -1,0 +1,216 @@
+---
+{% if is_new_relic_logging_enabled %}
+# Source: nri-bundle/charts/newrelic-logging/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: newrelic-logging
+    chart: newrelic-logging-1.0.2
+    release: nri-bundle
+    app.kubernetes.io/name: newrelic-logging
+  name: nri-bundle-newrelic-logging
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - pods
+    verbs: ["get", "list", "watch"]
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: newrelic-logging
+    chart: newrelic-logging-1.0.2
+    release: "nri-bundle"
+  name: nri-bundle-newrelic-logging
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: newrelic-logging
+    chart: newrelic-logging-1.0.2
+    release: nri-bundle
+    app.kubernetes.io/name: newrelic-logging
+  name: nri-bundle-newrelic-logging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nri-bundle-newrelic-logging
+subjects:
+- kind: ServiceAccount
+  name: nri-bundle-newrelic-logging
+  namespace: new-relic
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: newrelic-logging
+    chart: newrelic-logging-1.0.2
+    release: nri-bundle
+    app.kubernetes.io/name: newrelic-logging
+  name: nri-bundle-newrelic-logging-fluent-bit-config
+data:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     ${LOG_LEVEL}
+        Daemon        off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+
+    @INCLUDE input-kubernetes.conf
+    @INCLUDE output-newrelic.conf
+    @INCLUDE filter-kubernetes.conf
+
+  input-kubernetes.conf: |
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              ${PATH}
+        Parser            docker
+        DB                /var/log/flb_kube.db
+        Mem_Buf_Limit     7MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+
+  filter-kubernetes.conf: |
+    [FILTER]
+        Name           kubernetes
+        Match          kube.*
+        Kube_URL       https://kubernetes.default.svc.cluster.local:443
+        Merge_JSON_Log Off
+
+    [FILTER]
+        Name record_modifier
+        Match *
+        Record environment {{ env }}
+
+  output-newrelic.conf: |
+    [OUTPUT]
+        Name  newrelic
+        Match *
+        licenseKey ${LICENSE_KEY}
+        endpoint ${ENDPOINT}
+        maxBufferSize ${BUFFER_SIZE}
+        maxRecords ${MAX_RECORDS}
+
+  parsers.conf: |
+    [PARSER]
+        Name   json
+        Format json
+        Time_Key time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+        # Command      |  Decoder | Field | Optional Action
+        # =============|==================|=================
+        Decode_Field_As   escaped    log
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: newrelic-logging
+    chart: newrelic-logging-1.0.2
+    release: nri-bundle
+    app.kubernetes.io/name: newrelic-logging
+  name: nri-bundle-newrelic-logging
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: newrelic-logging
+      release: nri-bundle
+  template:
+    metadata:
+      labels:
+        app: newrelic-logging
+        release: nri-bundle
+        app.kubernetes.io/name: newrelic-logging
+    spec:
+      serviceAccountName: nri-bundle-newrelic-logging
+      hostNetwork: true # This option is a requirement for the Infrastructure Agent to report the proper hostname in New Relic.
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: newrelic-logging
+          image: newrelic/newrelic-fluentbit-output:1.1.2
+          imagePullPolicy: "IfNotPresent"
+          env:
+            - name: ENDPOINT
+              value: "https://log-api.newrelic.com/log/v1"
+            - name: SOURCE
+              value: "kubernetes"
+            - name: LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: security-new-relic
+                  key: license_key
+            - name: BUFFER_SIZE
+              value: "256000"
+            - name: MAX_RECORDS
+              value: "500"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: PATH
+              value: "/var/log/containers/*.log"
+          command:
+            - /fluent-bit/bin/fluent-bit
+            - -c
+            - /fluent-bit/etc/fluent-bit.conf
+            - -e
+            - /fluent-bit/bin/out_newrelic.so
+          volumeMounts:
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc
+            - name: var
+              mountPath: /var
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 250m
+              memory: 64Mi
+
+      volumes:
+        - name: fluent-bit-config
+          configMap:
+            name: nri-bundle-newrelic-logging-fluent-bit-config
+        - name: var
+          hostPath:
+            path: /var
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+
+{% endif %}

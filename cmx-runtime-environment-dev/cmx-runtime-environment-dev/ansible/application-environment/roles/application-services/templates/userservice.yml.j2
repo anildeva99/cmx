@@ -1,0 +1,250 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+spec:
+  selector:
+    app: user-service
+  ports:
+    # !!! I can't figure out why but setting 'name: http' prevents tunneling through the cluster bastion from working,
+    # !!! even though I can make requests to the services when ssh'd into the cluster bastion. But tunneling
+    # !!! through the cluster bastion and making a request from my laptop results in (for any http service):
+    # !!! "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+    # !!! I think this will be a problem for ingress/routing, we need HTTP to route things properly
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_user_service }}
+    targetPort: {{ container_ports.cmx_user_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+    version: {{ image_versions.cmx_user_service }}
+spec:
+  replicas:  {{ (kubernetes_hpa.user_service.min_pods is defined) | ternary( kubernetes_hpa.user_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: user-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: user-service
+        version: {{ image_versions.cmx_user_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.userservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-user-service:{{ image_versions.cmx_user_service }}
+        imagePullPolicy: {{ cmx_user_service_image_pull_policy }}
+        name: user-service
+        resources:
+          limits:
+            memory: {{ user_service_max_container_memory }}
+            cpu: {{ user_service_max_cpus }}
+          requests:
+            memory: {{ user_service_min_container_memory }}
+            cpu: {{ user_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/user-service/user-service-{{ image_versions.cmx_user_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ user_service_min_heap_size }}", "-Xmx{{ user_service_max_heap_size }}", "/opt/tools/user-service/user-service-{{ image_versions.cmx_user_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_user_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_user_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_user_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_user_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: USER_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: userservice-database
+                key: dburl
+          - name: USER_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: userservice-database
+                key: dbusername
+          - name: USER_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: userservice-database
+                key: dbpassword
+          - name: USER_SERVICE_DB_INITIAL_SIZE
+            value: "{{ user_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: USER_SERVICE_DB_MAX_WAIT
+            value: "{{ user_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: USER_SERVICE_DB_MAX_ACTIVE
+            value: "{{ user_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: USER_SERVICE_DB_MAX_IDLE
+            value: "{{ user_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: USER_SERVICE_DB_MIN_IDLE
+            value: "{{ user_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: LIQUIBASE_USER_CONTEXTS
+            value: "{{ liquibase_user_contexts }}"
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+          # SMTP environment variables
+          - name: SMTP_ADDRESS
+            valueFrom:
+              secretKeyRef:
+                name: security-smtp
+                key: address
+          - name: SMTP_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-smtp
+                key: username
+          - name: SMTP_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-smtp
+                key: password
+          - name: SMTP_PORT
+            value: "587"
+          - name: SMTP_PROTOCOL
+            value: 'smtp'
+          - name: SMTP_AUTH
+            value: 'true'
+          - name: SMTP_STARTTLS_ENABLE
+            value: 'true'
+          - name: SMTP_DEBUG
+            value: 'false'
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: user-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: user-service
+  minReplicas: {{ (kubernetes_hpa.user_service.min_pods is defined) | ternary( kubernetes_hpa.user_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.user_service.max_pods is defined) | ternary( kubernetes_hpa.user_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Update license key for New Relic.
+
+echo "Enter new license key for New Relic: "
+read licensekey
+
+  # Update AWS secrets
+aws secretsmanager update-secret --region "{{ region }}" \
+    --secret-id "CodaMetrixApplication/NewRelic/{{ env }}" \
+    --kms-key-id '{{ application_secrets_kms_key_alias }}' \
+    --secret-string "{\"license_key\":\"$licensekey\"}"

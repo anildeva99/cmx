@@ -1,0 +1,107 @@
+---
+- name: Set istio-system Namespace resource state to {{ state }}
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'istio-system-namespace.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "See if {{ istio_version }} is already downloaded"
+  stat:
+    path: "{{ temp_directory }}/istio-{{ istio_version }}"
+  register: istio_download
+
+- name: Download Istio installation to the temp directory and extract it
+  shell: >
+    curl -L
+    https://git.io/getLatestIstio|ISTIO_VERSION\="{{ istio_version }}" sh -
+  args:
+    chdir: "{{ temp_directory }}"
+  when: (not istio_download.stat.exists)
+
+  # HACK: Helm 3.x does not like the templating within
+  # the version of istio we use so we need to template out the following files
+  # More info is here: https://github.com/istio/istio/pull/23077/files
+  # It was apparently fixed in Istio v 1.5.x:
+  #   https://github.com/istio/istio/issues/22366
+- name: Hack to fix istio 1.2.X when using Helm 1.3.x
+  vars:
+    install_dir: "{{ temp_directory }}/istio-{{ istio_version }}"
+    path: "install/kubernetes/helm/istio/charts/gateways/templates"
+  block:
+    - name: Copy patched rolebindings.yaml into place
+      copy:
+        dest: "{{ install_dir }}/{{ path }}/rolebindings.yaml"
+        mode: 0644
+        src: istio-helm3-patched-rolebindings.yaml
+    - name: Copy patched role.yaml into place
+      copy:
+        dest: "{{ install_dir }}/{{ path }}/role.yaml"
+        mode: 0644
+        src: istio-helm3-patched-role.yaml
+
+# TODO: [DEVOPS-402] Switch to using the community.kubernetes.helm ansible
+#   module
+- name: Generate Istio Custom Resource Definitions (CRDs)
+  shell: >
+    helm template istio-init
+    install/kubernetes/helm/istio-init
+    --namespace istio-system > ./istio-crds.yml
+  args:
+    chdir: "{{ temp_directory }}/istio-{{ istio_version }}"
+
+- name: Apply Istio Custom Resource Definitions (CRDs)
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    resource_definition: "{{ lookup('file',
+      '{{ temp_directory }}/istio-{{ istio_version }}/istio-crds.yml')|
+      from_yaml_all|select('ne', None)|list }}"
+    state: "{{ state }}"
+
+- name: Template istio-install-params.yml file
+  template:
+    dest: "{{ temp_directory }}/istio-{{ istio_version }}/istio-install-params.yml"
+    mode: 0644
+    src: istio-install-params.yml.j2
+
+# TODO: [DEVOPS-402] Switch to using the community.kubernetes.helm ansible module
+- name: Generate Istio installation
+  shell: >
+    helm template istio install/kubernetes/helm/istio
+    --namespace istio-system
+    --values istio-install-params.yml > ./istio-install.yml
+  args:
+    chdir: "{{ temp_directory }}/istio-{{ istio_version }}"
+
+- name: Apply Istio installation
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    resource_definition: "{{ lookup('file',
+      '{{ temp_directory }}/istio-{{ istio_version }}/istio-install.yml')|
+      from_yaml_all|select('ne', None)|list }}"
+    state: "{{ state }}"
+
+# TODO: [DEVOPS-388] Replace ansible pause with until loop
+# UPDATE: Switch to waiting for istio-egressgateway Deployment
+# Type: Available
+# Status: True
+- name: Sleep 5 seconds to allow kubernetes to create istio resources
+  pause:
+    seconds: 5
+
+- name: Delete default istio-ingressgateway service (public)
+  community.kubernetes.k8s:
+    api_version: v1
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    kind: Service
+    name: istio-ingressgateway
+    namespace: istio-system
+    state: absent
+
+- name: Set Istio Config resources state to {{ state }}
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: istio-system
+    resource_definition: "{{ lookup('template', 'istio-config.yml.j2') }}"
+    state: "{{ state }}"

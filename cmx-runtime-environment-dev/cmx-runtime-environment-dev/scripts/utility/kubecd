@@ -1,0 +1,11 @@
+#! /usr/bin/env bash
+NAMESPACE=$2
+if [ "$NAMESPACE" == "" ]; then
+  NAMESPACE="codametrix"
+fi
+
+echo ""
+kubectl config use-context $1
+kubectl config set-context --current --namespace=$NAMESPACE
+echo ""
+echo 'Switched to namespace: ' $NAMESPACE

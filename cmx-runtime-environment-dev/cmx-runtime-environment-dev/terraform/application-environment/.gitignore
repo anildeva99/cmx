@@ -1,0 +1,4 @@
+backend.tf
+*.x
+files/kinesis-firehose-cloudwatch-logs-processor.zip
+files/elasticsearch_lambda_function_build

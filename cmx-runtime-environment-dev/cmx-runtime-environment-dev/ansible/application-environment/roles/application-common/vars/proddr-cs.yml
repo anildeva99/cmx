@@ -1,0 +1,51 @@
+# Customer Specific variables
+
+# Enable Cisco CSRs for customer customer networking ?
+enable_customer_networking: false
+customer_networking_instance_type: t2.medium
+
+# Customer VPN AMIs (Cisco Cloud Services Router (CSR) 1000V - Security Pkg. Max Performance)
+customer_networking_amis:
+  us-west-2: ami-076cd1de76b34bcb1
+
+###################################################
+#  Traffic from Application mirth to Ingress mirth
+###################################################
+# Partners: 20000 - 20049
+# CU Medicine: 20050 - 20099
+app_mirth_to_ingress_mirth_open_ports:
+  - 20000 # Partners ORU
+  - 20001 # Note! Skip this port, it is used by Kiali
+  - 20002 # Partners DFT
+  - 20050 # CU Medicine ORU
+  - 20051 # CU Medicine DFT
+
+##########
+# Partners
+#########
+partners_vpn_secret_recovery_window_days: 30
+
+# Partners reserved ports (reserved via L2L request with Partners network engineering):
+# PDR <-> CMX: 30000 - 30010
+# ICM <-> CMX: 30200 - 30231
+# Ensemble <-> CMX: 30400 - 30415
+partners_ingress_open_ports:
+  - 30000 # MGPO ADT (Prelude ADT [PDR] to CMX)
+  - 30001 # MGPO Results (Radiant ORU [PDR] to CMX)
+  - 30002 # MGPO CAC (CMX ORU to CAC [PDR])
+  - 30201 # MGPO Feedback (DFT [ICM] to CMX)
+  - 30202 # MGPO Billing (CMX DFT to Billing [ICM])
+
+#############
+# CU Medicine
+#############
+cumedicine_vpn_secret_recovery_window_days: 30
+
+# CU Medicine reserved ports:
+# CU Medicine HSF (integration engine) <-> CMX: 31000 - 31031
+cumedicine_ingress_open_ports:
+  - 31001 # ADT (Admission/Discharge/Transfer)
+  - 31002 # ORU (Radiology Orders)
+  - 31003 # Feedback (DFT from CAC)
+  - 31004 # Send to CAC (ORU to CAC)
+  - 31005 # Send to Billing (DFT to Billing)

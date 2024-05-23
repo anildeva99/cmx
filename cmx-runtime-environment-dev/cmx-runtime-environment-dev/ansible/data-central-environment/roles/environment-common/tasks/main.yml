@@ -1,0 +1,19 @@
+---
+- name: Load environment-specific variables
+  include_vars:
+    file: "{{ env }}.yml"
+
+- name: Load user configuration variables
+  include_vars:
+    file: "{{ env }}-users.yml"
+
+- name: Load peering variables
+  include_vars:
+    file: "{{ env }}-peering.yml"
+
+- name: "Create ${HOME}/.codamatrix/{{ env }}/tmp"
+  file:
+    mode: 0700
+    path: "{{ lookup('env','HOME') }}/.codametrix/{{ env }}/tmp"
+    state: directory
+  when: (inventory_hostname is in groups.local)

@@ -1,0 +1,461 @@
+---
+shortenv: "production"
+region: us-east-1
+cmx_automate_dns_name: codametrix.ai
+management_bucket: management.cmxproduction.codametrix.com
+region_specific_elb_hosted_zone_id: Z35SXDOTRQ7X7K
+
+# AWS CodaMetrix Production account
+aws_account_name: cmxproduction
+aws_account_id: "606837856353"
+ip_range_prefix: "10.59"
+ingress_ip_range_prefix: "10.60"
+
+# DR related vars
+dr_environment: "proddr"
+dr_region: "us-west-2"
+enable_s3_replication: true
+enable_rds_replication: true
+
+# !!! Remove this and replace with our own sagemaker-data bucket
+sagemaker_data_bucket: sagemaker.development.app.codametrix.com
+sagemaker_data_key_alias: MuDevelopmentResources-development-sagemaker_kms_key
+sagemaker_data_key_alias_arn: "arn:aws:kms:{{ region }}:109882322034:alias/{{ sagemaker_data_key_alias }}"
+
+# Dundas
+dundas_enabled: true
+dundas_server_url: "https://www.production.application.codametrix.com/dundasbi/"
+dundas_filesystem_id: "62725ee9-2630-421c-b9e1-07dc2b1b8869"
+create_dundas_service_entry: true
+dundas_address: dundas.dc3.datacentral.codametrix.com
+
+datacentral3_dundas_sg: sg-046d4ebee158780ce
+application_data_warehouse_additional_ingress_sgs:
+  - "{{ datacentral3_dundas_sg }}"
+  - "{{ codametrix_tools_dundas_sg }}"
+  - "{{ codametrix_cqa_instance_sg }}"
+
+shared_resource_tags:
+  BillingCategory: Application
+  BillingTeam: Engineering
+  BillingEnvironment: Production
+  BillingApplication: CMx
+  Environment: "{{ env }}"
+  Usage: CodaMetrix Application
+
+aws_secrets_recovery_window_in_days: 30
+
+# Enable cluster bastion?
+enable_cluster_bastion: true
+
+# Latest CodaMetrix Runtime Environment EKS version 1.16 AMI's
+node_amis:
+  us-east-1: ami-0fd3848962384cb75
+
+# Latest CodaMetrix Runtime Environment Bastion version 1.1 AMI's
+bastion_amis:
+  us-east-1: ami-0f24bc745ae312e65
+
+# Ingress Mirth AMIs (Ubuntu 18.04 LTS, [October, 2020])
+ingress_mirth_amis:
+  us-east-1: ami-074ce6f2905b38722
+
+cmx_case_builder_service_spring_profile: prod
+cmx_case_builder_service_image_pull_policy: Always
+cmx_claim_service_spring_profile: prod
+cmx_claim_service_image_pull_policy: Always
+cmx_configuration_service_spring_profile: prod
+cmx_configuration_service_image_pull_policy: Always
+cmx_dashboard_ui_image_pull_policy: Always
+cmx_dictionary_service_spring_profile: prod
+cmx_dictionary_service_image_pull_policy: Always
+cmx_documentation_service_spring_profile: prod
+cmx_documentation_service_image_pull_policy: Always
+cmx_event_dispatcher_service_spring_profile: prod
+cmx_event_dispatcher_service_image_pull_policy: Always
+cmx_importer_service_spring_profile: prod
+cmx_importer_service_image_pull_policy: Always
+cmx_order_service_spring_profile: prod
+cmx_order_service_image_pull_policy: Always
+cmx_patient_service_spring_profile: prod
+cmx_patient_service_image_pull_policy: Always
+cmx_user_service_spring_profile: prod
+cmx_user_service_image_pull_policy: Always
+cmx_cluster_bastion_image_pull_policy: Always
+cmx_mirth_image_pull_policy: Always
+cmx_process_service_spring_profile: prod
+cmx_process_service_image_pull_policy: Always
+mu_sagemaker_service_spring_profile: prod
+mu_sagemaker_service_image_pull_policy: Always
+cmx_exporter_service_spring_profile: prod
+cmx_exporter_service_image_pull_policy: Always
+
+###############################
+# Application service resources
+###############################
+case_builder_service_min_container_memory: "4Gi"
+case_builder_service_max_container_memory: "8Gi"
+case_builder_service_min_heap_size: "4g"
+case_builder_service_max_heap_size: "7g"
+case_builder_service_min_cpus: 2
+case_builder_service_max_cpus: 2
+
+claim_service_min_container_memory: "2Gi"
+claim_service_max_container_memory: "3Gi"
+claim_service_min_heap_size: "2g"
+claim_service_max_heap_size: "3g"
+claim_service_min_cpus: 1
+claim_service_max_cpus: 1
+
+configuration_service_min_container_memory: "2Gi"
+configuration_service_max_container_memory: "3Gi"
+configuration_service_min_heap_size: "2g"
+configuration_service_max_heap_size: "3g"
+configuration_service_min_cpus: 1
+configuration_service_max_cpus: 1
+
+dashboard_ui_min_container_memory: "1Gi"
+dashboard_ui_max_container_memory: "2Gi"
+dashboard_ui_min_cpus: 1
+dashboard_ui_max_cpus: 1
+
+dictionary_service_min_container_memory: "2Gi"
+dictionary_service_max_container_memory: "3Gi"
+dictionary_service_min_heap_size: "2g"
+dictionary_service_max_heap_size: "3g"
+dictionary_service_min_cpus: 1
+dictionary_service_max_cpus: 1
+
+documentation_service_min_container_memory: "2Gi"
+documentation_service_max_container_memory: "3Gi"
+documentation_service_min_heap_size: "2g"
+documentation_service_max_heap_size: "3g"
+documentation_service_min_cpus: 1
+documentation_service_max_cpus: 1
+
+event_dispatcher_service_min_container_memory: "2Gi"
+event_dispatcher_service_max_container_memory: "3Gi"
+event_dispatcher_service_min_heap_size: "2g"
+event_dispatcher_service_max_heap_size: "3g"
+event_dispatcher_service_min_cpus: 500m
+event_dispatcher_service_max_cpus: 1
+
+importer_service_min_container_memory: "2Gi"
+importer_service_max_container_memory: "3Gi"
+importer_service_min_heap_size: "2g"
+importer_service_max_heap_size: "3g"
+importer_service_min_cpus: 1
+importer_service_max_cpus: 1
+
+exporter_service_min_container_memory: "2Gi"
+exporter_service_max_container_memory: "3Gi"
+exporter_service_min_heap_size: "2g"
+exporter_service_max_heap_size: "3g"
+exporter_service_min_cpus: 1
+exporter_service_max_cpus: 1
+
+order_service_min_container_memory: "2Gi"
+order_service_max_container_memory: "3Gi"
+order_service_min_heap_size: "2g"
+order_service_max_heap_size: "3g"
+order_service_cpus: 1
+
+patient_service_min_container_memory: "3Gi"
+patient_service_max_container_memory: "6Gi"
+patient_service_min_heap_size: "3g"
+patient_service_max_heap_size: "5632m"
+patient_service_min_cpus: 2
+patient_service_max_cpus: 2
+
+user_service_min_container_memory: "2Gi"
+user_service_max_container_memory: "3Gi"
+user_service_min_heap_size: "2g"
+user_service_max_heap_size: "3g"
+user_service_min_cpus: 2
+user_service_max_cpus: 2
+
+process_service_min_container_memory: "2Gi"
+process_service_max_container_memory: "4Gi"
+process_service_min_heap_size: "2g"
+process_service_max_heap_size: "3500m"
+process_service_min_cpus: 2
+process_service_max_cpus: 2
+
+mu_sagemaker_service_min_container_memory: "2Gi"
+mu_sagemaker_service_max_container_memory: "3Gi"
+mu_sagemaker_service_min_heap_size: "2g"
+mu_sagemaker_service_max_heap_size: "3g"
+mu_sagemaker_service_min_cpus: 1
+mu_sagemaker_service_max_cpus: 1
+
+mirth_min_container_memory: "8Gi"
+mirth_max_container_memory: "11Gi"
+mirth_min_heap_size: "8g"
+mirth_max_heap_size: "10g"
+mirth_min_cpus: 3
+mirth_max_cpus: 3
+
+# Although the services above could technically fit into 2 c5.4xlarges,
+# they can't once other services e.g. istio, new relic are introduced.
+# Also we need these large instance types to run Mirth with a lot of memory
+# for historical imports.
+worker_node_instance_type: c5.4xlarge
+worker_node_asg_min_size: 3
+worker_node_asg_max_size: 10
+
+###########################
+# Ingress service resources
+###########################
+ingress_mirth_min_heap_size: "6g"
+ingress_mirth_max_heap_size: "12g"
+ingress_mirth_instance_type: c5.4xlarge
+
+# Application database parameters
+application_database_size: 8192
+application_database_version: "11.10"
+application_database_instance_class: "db.t3.2xlarge"
+application_database_backup_retention_period: 30
+application_database_deletion_protection: true
+application_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+application_database_monitoring_interval: 30
+application_database_secret_recovery_window_days: 30
+application_database_multi_az: true
+
+# Mirth database parameters
+mirth_database_size: 4096
+mirth_database_version: "11.10"
+mirth_database_instance_class: "db.t3.xlarge"
+mirth_database_backup_retention_period: 30
+mirth_database_deletion_protection: true
+mirth_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+mirth_database_monitoring_interval: 30
+mirth_database_secret_recovery_window_days: 30
+mirth_database_multi_az: true
+
+ingress_mirth_database_size: 6144
+ingress_mirth_database_instance_class: "db.t3.medium"
+ingress_mirth_database_multi_az: true
+
+# Application data warehouse parameters
+application_data_warehouse_node_type: dc2.large
+application_data_warehouse_snapshot_retention_period: 30
+application_data_warehouse_cluster_version: 1.0
+application_data_warehouse_number_of_nodes: 2
+application_data_warehouse_logging_prefix: redshift/
+
+# !!! Note: snapshot copy currently disabled, see redshift.tf
+application_data_warehouse_snapshot_copy:
+  region: us-east-2
+  retention_period: 7
+application_data_warehouse_secret_recovery_window_days: 30
+application_data_warehouse_log_bucket_policy_aws_account: "193672423079"
+
+# Application elasticsearch parameters
+application_elasticsearch_version: "7.1"
+application_elasticsearch_ebs_volume_size: "1536"
+application_elasticsearch_instance_type: r5.xlarge.elasticsearch
+application_elasticsearch_instance_count: 4
+application_elasticsearch_dedicated_master_enabled: true
+application_elasticsearch_zone_awareness_enabled: true
+
+# Elasticache
+elasticache_node_type: cache.t3.medium
+elasticache_number_cache_clusters: 2
+
+# Bastion parameters
+bastion_instance_type: t3a.micro
+
+letsencrypt_environment_server: https://acme-v02.api.letsencrypt.org/directory
+
+# New Relic stuff
+is_new_relic_logging_enabled: false
+
+# Liquibase Contexts
+liquibase_user_contexts: "schema,base,data,audit,PHS,CHS,demo,{{ env }}"
+liquibase_configuration_contexts: "schema,base,data,audit,PHS,CHS,{{ env }}"
+liquibase_dictionary_contexts: "schema,base,data,audit,PHS,CHS,demo,{{ env }}"
+liquibase_casebuilder_contexts: "schema,base,data,audit,PHS,CHS,{{ env }}"
+liquibase_exporter_contexts: "schema,base,data,audit,PHS,CHS,{{ env }}"
+
+##############
+# EMR Settings
+##############
+emr_core_instance_count_min: 3
+emr_core_instance_count_max: 3
+emr_ebs_root_volume_size: 100
+emr_core_volume_size_in_gb: 100
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+firehose_lambda_function_dir: files/firehose_lambda_function
+cloud_watch_ingest_to_elasticsearch_log_groups:
+  cloudtrail_log_group:
+    name: AWSAccountSetup-CloudTrailLogGroup-F1AB6HRMZF4X
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:AWSAccountSetup-CloudTrailLogGroup-UER07OI117XS"
+    kinesis_shard_count: 1
+    index_name: "cloudtrail"
+    log_template_name: "es_cloudtrail"
+  application_postgresql_log_group:
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-application-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-application-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "application-postgresql"
+    log_template_name: "es_postgres"
+  ingress_postgresql_log_group:
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-ingress-mirth-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-ingress-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "ingress-mirth-postgresql"
+    log_template_name: "es_postgres"
+  mirth_postgresql_log_group:
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-mirth-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-mirth-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "mirth-postgresql"
+    log_template_name: "es_postgres"
+
+# Security Hub
+is_securityhub_account: true
+
+####################
+#  CloudWatch Alarms
+####################
+low_storage_space_cloudwatch_alarm:
+  elastic_search:
+    application_elasticsearch:
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is in Megabytes,
+      # set to 512 Gigabytes (total volume size is 2048 GB)
+      free_storage_space_threshold: 524288
+  rds:
+    application_db:
+      name: application
+      db_identifier: "codametrixapplication-{{ env }}-application-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is in bytes, set to 2TB (total volume size is 8TB)
+      free_storage_space_threshold: 2199023255552
+      unit: Bytes
+    codametrixapplication-ingress-mirth-db :
+      name: ingress-mirth
+      db_identifier: "codametrixapplication-{{ env }}-ingress-mirth-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is in bytes, set to 1TB (total volume size is 4TB)
+      free_storage_space_threshold: 1099511627776
+      unit: Bytes
+    codametrixapplication-mirth-db :
+      name: mirth
+      db_identifier: "codametrixapplication-{{ env }}-mirth-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is in bytes, set to 1TB (total volume size is 4TB)
+      free_storage_space_threshold: 1099511627776
+      unit: Bytes
+  redshift:
+    application_data_warehouse:
+      name: data-warehouse
+      db_identifier: "codametrixapplication-{{ env }}-data-warehouse-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # Percentage disk space used for data warehouse db
+      percentage_disk_space_used_threshold: 75
+
+# Alert if Mirth or the Customer Networking CSR 1 drop status
+# checks failed or less than 5K bytes/sec throughput
+ingress_mirth_alarms_enabled: true
+ingress_mirth_liveness_threshold: 0
+ingress_mirth_network_throughput_threshold: 5120
+customer_networking_csr_1_liveness_threshold: 0
+customer_networking_csr_1_network_throughput_threshold: 5120
+
+# Vitalware
+vitalware_enabled: true
+
+# Mirth
+mirth_processing_indicator: P
+
+# Security Groups
+
+# Allow public access to codametrix.ai
+cmx_automate_ingress_lb_internal: false
+cmx_automate_ingress_from_cidr_sgs:
+  - description: Allow HTTPS from anywhere
+    from_port: "443"
+    to_port: "443"
+    protocol: tcp
+    cidr_blocks:
+      - "0.0.0.0/0"
+  - description: Allow HTTP from anywhere
+    from_port: "80"
+    to_port: "80"
+    protocol: tcp
+    cidr_blocks:
+      - "0.0.0.0/0"
+
+application_cmx_api_ingress_from_sg_sgs:
+  - description: Allow HTTPS from ACT production CodePrediction workers
+    from_port: "443"
+    to_port: "443"
+    protocol: tcp
+    source_security_group_id: "{{ act_production_codeprediction_worker_sg }}"
+  - description: Allow HTTP from ACT production CodePrediction workers
+    from_port: "80"
+    to_port: "80"
+    protocol: tcp
+    source_security_group_id: "{{ act_production_codeprediction_worker_sg }}"
+
+# MSK / Kafka
+msk_instance_type: kafka.m5.large
+number_of_kafka_broker_nodes: 2
+msk_ebs_volume_size: 128
+
+# Kubernetes autoscaling configuration
+kubernetes_hpa:
+  default:
+    min_pods: 1
+    max_pods: 10
+  case_builder_service:
+    min_pods: 2
+    max_pods: 10
+  claim_service:
+    min_pods: 2
+    max_pods: 10
+  configuration_service:
+    min_pods: 2
+    max_pods: 10
+  dictionary_service:
+    min_pods: 2
+    max_pods: 10
+  documentation_service:
+    min_pods: 2
+    max_pods: 10
+  exporter_service:
+    min_pods: 2
+    max_pods: 10
+  importer_service:
+    min_pods: 2
+    max_pods: 10
+  order_service:
+    min_pods: 2
+    max_pods: 10
+  patient_service:
+    min_pods: 2
+    max_pods: 10
+  process_service:
+    min_pods: 2
+    max_pods: 10
+  user_service:
+    min_pods: 2
+    max_pods: 10

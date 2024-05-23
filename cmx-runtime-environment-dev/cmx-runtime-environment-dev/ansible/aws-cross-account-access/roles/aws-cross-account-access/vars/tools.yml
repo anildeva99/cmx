@@ -1,0 +1,86 @@
+---
+region: us-east-1
+management_bucket: management.tools.codametrix.com
+env: tools
+
+foreign_accounts:
+  - "843902778531" # legacy sandbox
+  - "109882322034" # legacy development
+  - "441219382285" # legacy stage
+  - "075380275136" # legacy prod
+  - "097524411557" # cmx onboarding
+  - "048429806352" # cmx central
+  - "876690251215" # cmx data central
+  - "594832626604" # cmx demo
+  - "397895817754" # cmx ml
+  - "804152217010" # cmx ml research
+  - "097524411557" # cmx onboarding
+  - "606837856353" # cmx production
+  - "733943117466" # cmx stage
+  - "718323977716" # cmx test
+
+# ECR repos that will be enabled for cross-account access
+ecr_repos:
+  - "cmx-case-builder-service"
+  - "cmx-claim-service"
+  - "cmx-configuration-service"
+  - "cmx-dashboard-ui"
+  - "cmx-dictionary-service"
+  - "cmx-documentation-service"
+  - "cmx-external-worker"
+  - "cmx-event-dispatcher"
+  - "cmx-importer-service"
+  - "cmx-order-service"
+  - "cmx-process-service"
+  - "cmx-patient-service"
+  - "cmx-user-service"
+  - "cmx-bastion-host"
+  - "cmx-mirth"
+  - "mu-function-example"
+  - "mu-function-index"
+  - "mu-function-fileprocessing"
+  - "mu-function-normalizenotes"
+  - "mu-function-mapping"
+  - "mu-sagemaker"
+  - "mu-function-pyramid"
+  - "mu-function-radiology-prediction"
+  - "mu-function-unmapping"
+  - "ui-omnibus"
+  - "cmx-exporter-service"
+  - "cmx-exporter-interface"
+  - "cmx-monitor-service"
+  - "cmx-mirth-standalone"
+  - "dictionaries"
+  - "cmx-java-service-base"
+
+# S3 Buckets that access will be given to.
+s3_buckets:
+  job-manifest.tools.mu.codametrix.com:
+    - bucket_object_spec: "*"
+      bucket_object_actions:
+        - s3:GetObject
+      bucket_actions:
+        - s3:ListBucket
+      foreign_account:
+        - "843902778531"
+        - "109882322034"
+        - "441219382285"
+        - "075380275136"
+        - "097524411557"
+        - "048429806352"
+        - "876690251215"
+        - "594832626604"
+        - "397895817754"
+        - "804152217010"
+        - "097524411557"
+        - "606837856353"
+        - "733943117466"
+        - "718323977716"
+
+
+kms_keys:
+  - key_alias: "alias/kms/s3/job-manifest"
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey

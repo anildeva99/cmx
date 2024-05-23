@@ -1,0 +1,16 @@
+- name: Clean up terraform config files (backend.tf, terraform.tfvars)
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    terraform_path: ../../terraform/data-central-environment
+  tasks:
+    - name: Remove backend.tf
+      file:
+        path: "{{ terraform_path }}/backend.tf"
+        state: absent
+
+    - name: Remove terraform.tfvars
+      file:
+        path: "{{ terraform_path }}/terraform.tfvars"
+        state: absent

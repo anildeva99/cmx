@@ -1,0 +1,21 @@
+# Peering connections for the stage1 environment
+
+application_peer_vpc_routes:
+  - pcx_name: DataCentral1-CMXStage1Application # Data Central 1 <-> Stage 1 Application
+    destination_cidr: 10.71.0.0/16
+  - pcx_name: CMXStage1App-CMXStage1Ingress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.58.0.0/16
+  - pcx_name: ToolsNet-CMXStage1 # Tools Network <-> Stage 1
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: ACTStage-CMXStage1Application
+    destination_cidr: 10.1.0.0/16
+
+ingress_peer_vpc_routes:
+  - pcx_name: CMXOnboardingIngress-CMXStage1Ingress # Onboarding Ingress -> Stage 1 Ingress
+    destination_cidr: 10.54.0.0/16
+  - pcx_name: CMXStage1App-CMXStage1Ingress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.57.0.0/16
+  - pcx_name: ToolsNet-CMXStage1Ingress # Tools Network <-> Stage 1 Ingress
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: CMXDevelopmentIngress-CMXStage1Ingress # Development Ingress <-> Stage 1 Ingress
+    destination_cidr: 10.52.0.0/16

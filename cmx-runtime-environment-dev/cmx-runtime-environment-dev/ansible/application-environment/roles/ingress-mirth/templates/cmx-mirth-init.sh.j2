@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Make sure we can find the other scripts in case these aren't installed in PATH
+PATH=$PATH:.
+
+IMAGE="cmx-mirth-standalone"
+IMAGE_TAG={{ image_versions.cmx_ingress_mirth }}
+IMAGE_REGION={{ region }}
+
+# Get the AWS account ID and use it to pull the docker image
+AWS_ACCOUNT_ID={{ codametrix_tools_account_id }}
+
+echo 'Fetching docker image: ' $IMAGE
+# AWS CLI V2 - login to ECR
+aws ecr get-login-password --region $IMAGE_REGION \
+| docker login --username AWS \
+    --password-stdin $AWS_ACCOUNT_ID.dkr.ecr."$IMAGE_REGION".amazonaws.com
+
+IMAGE_PATH=$AWS_ACCOUNT_ID.dkr.ecr."$IMAGE_REGION".amazonaws.com/"$IMAGE":"$IMAGE_TAG"
+docker pull $IMAGE_PATH 1>&2
+docker tag $IMAGE_PATH $IMAGE:$IMAGE_TAG
+
+echo 'Fetched docker image: ' $IMAGE

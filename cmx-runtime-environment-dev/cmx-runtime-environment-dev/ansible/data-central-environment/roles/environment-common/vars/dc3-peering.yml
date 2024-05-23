@@ -1,0 +1,8 @@
+---
+peer_vpc_routes:
+  - pcx_name: DataCentral3-CMXProductionApplication # Production
+    destination_cidr: 10.59.0.0/16
+  - pcx_name: ToolsNet-DataCentral3 # Tools Network <-> Data Central 3
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: DataCentral3-CMXProdDRApplication # Data Central 3 <-> ProdDR Application
+    destination_cidr: 10.65.0.0/16

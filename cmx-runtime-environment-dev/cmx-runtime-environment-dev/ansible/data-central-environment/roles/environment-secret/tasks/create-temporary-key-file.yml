@@ -1,0 +1,8 @@
+---
+- name: Create temporary key file with permissions
+  copy:
+    content: "{{ lookup('aws_secret',
+      aws_secret_key_name_var,
+      region=region) }}"
+    dest: "{{ localhost_key_path_var }}"
+    mode: 0400

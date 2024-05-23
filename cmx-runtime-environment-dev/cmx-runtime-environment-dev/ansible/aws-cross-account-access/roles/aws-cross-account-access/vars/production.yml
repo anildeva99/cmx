@@ -1,0 +1,42 @@
+---
+region: us-east-1
+management_bucket: management.cmxproduction.codametrix.com
+env: production
+
+foreign_accounts:
+  - "075380275136" # legacy production
+  - "097524411557" # cmx onboarding
+
+# ECR repos that will be enabled for cross-account access
+ecr_repos: []
+
+# S3 Buckets that access will be given to.
+s3_buckets:
+  data-lake.production.application.codametrix.com:
+      - bucket_object_spec: "icm/*" # !!! Note: Temporary - used for production ACT Gateway integration with the data lake (for the Rad Recon report)
+        bucket_object_actions:
+          - s3:GetObject
+          - s3:PutObject
+          - s3:PutObjectAcl
+        bucket_actions:
+          - s3:ListBucket
+        foreign_account:
+          - 075380275136
+
+      - bucket_object_spec: "*"
+        bucket_object_actions:
+          - s3:Get*
+          - s3:List*
+        bucket_actions:
+          - s3:Get*
+          - s3:List*
+        foreign_account:
+          - 097524411557
+
+kms_keys:
+  - key_alias: "alias/CodaMetrixApplication-{{ env }}-application_data_lake_emr_kms_key"
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey
+      - GenerateDataKey

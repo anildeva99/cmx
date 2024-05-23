@@ -1,0 +1,207 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: event-dispatcher-service
+  labels:
+    app: event-dispatcher-service
+spec:
+  selector:
+    app: event-dispatcher-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_event_dispatcher_service }}
+    targetPort: {{ container_ports.cmx_event_dispatcher_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: java-debug
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-dispatcher-service
+  labels:
+    app: event-dispatcher-service
+    version: {{ image_versions.cmx_event_dispatcher_service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-dispatcher-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: event-dispatcher-service
+        version: {{ image_versions.cmx_event_dispatcher_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.eventdispatcherservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-event-dispatcher:{{ image_versions.cmx_event_dispatcher_service }}
+        imagePullPolicy: {{ cmx_event_dispatcher_service_image_pull_policy }}
+        name: event-dispatcher-service
+        resources:
+          limits:
+            memory: {{ event_dispatcher_service_max_container_memory }}
+            cpu: {{ event_dispatcher_service_max_cpus }}
+          requests:
+            memory: {{ event_dispatcher_service_min_container_memory }}
+            cpu: {{ event_dispatcher_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/event-dispatcher/event-dispatcher-{{ image_versions.cmx_event_dispatcher_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ event_dispatcher_service_min_heap_size }}", "-Xmx{{ event_dispatcher_service_max_heap_size }}", "/opt/tools/event-dispatcher/event-dispatcher-{{ image_versions.cmx_event_dispatcher_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_event_dispatcher_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_event_dispatcher_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_event_dispatcher_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_event_dispatcher_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: EVENT_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: eventdispatcherservice-database
+                key: dburl
+          - name: EVENT_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: eventdispatcherservice-database
+                key: dbusername
+          - name: EVENT_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: eventdispatcherservice-database
+                key: dbpassword
+          - name: EVENT_SERVICE_DB_INITIAL_SIZE
+            value: "{{ event_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: EVENT_SERVICE_DB_MAX_WAIT
+            value: "{{ event_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: EVENT_SERVICE_DB_MAX_ACTIVE
+            value: "{{ event_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: EVENT_SERVICE_DB_MAX_IDLE
+            value: "{{ event_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: EVENT_SERVICE_DB_MIN_IDLE
+            value: "{{ event_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: AWS_SQS_ENDPOINT
+            value: "https://sqs.{{ region }}.amazonaws.com"
+          - name: AWS_SQS_CASE_BUILDER_QUEUE
+            value: {{ sqs_queues.casebuilder_queue.queue_name }}
+          - name: AWS_SQS_ACTIVITY_LOG_QUEUE
+            value: {{ sqs_queues.activitylog_queue.queue_name }}
+          - name: AWS_SQS_MU_QUEUE
+            value: {{ sqs_queues.munotification_queue.queue_name }}
+          - name: AWS_SQS_CASE_EVENTS_QUEUE
+            value: {{ sqs_queues.caseevents_queue.queue_name }}
+          - name: AWS_SQS_CHARGE_PROCESSOR_QUEUE
+            value: "{{ sqs_queues.charge_processor_queue.queue_name }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level

@@ -1,0 +1,26 @@
+# Environment to target
+environment = "{{ env }}"
+
+# Region to copy backups to
+aws_dst_region = "{{ aws_dst_region }}"
+
+# Region in which resources reside and in which primary backup
+# is stored and executed
+aws_src_region = "{{ aws_src_region }}"
+
+# Enable KMS key rotation
+enable_key_rotation = "{{ enable_key_rotation|lower }}"
+
+# Tag to apply to created resources
+shared_resource_tags = {
+  {% for tag_key, tag_value in shared_resource_tags.items() %}
+  "{{ tag_key }}" = "{{ tag_value }}",
+  {% endfor %}
+}
+
+# Resources that will be attached to the created backup plan
+target_resources_arns = [
+  {% for resource in target_resources_arns %}
+  "{{ resource }}",
+  {% endfor %}
+]

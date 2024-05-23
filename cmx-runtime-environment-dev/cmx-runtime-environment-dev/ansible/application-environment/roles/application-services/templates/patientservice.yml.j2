@@ -1,0 +1,221 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: patient-service
+  labels:
+    app: patient-service
+spec:
+  selector:
+    app: patient-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_patient_service }}
+    targetPort: {{ container_ports.cmx_patient_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  labels:
+    app: patient-service
+    version: {{ image_versions.cmx_patient_service }}
+spec:
+  replicas: {{ (kubernetes_hpa.patient_service.min_pods is defined) | ternary( kubernetes_hpa.patient_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: patient-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: patient-service
+        version: {{ image_versions.cmx_patient_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.patientservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-patient-service:{{ image_versions.cmx_patient_service }}
+        imagePullPolicy: {{ cmx_patient_service_image_pull_policy }}
+        name: patient-service
+
+        # !!! This command should go away, server.tomcat.max-threads should be in the application.yml file, parameterized as an environment variable
+        command: ["sh", "-c", "java -jar ${PROJECT_DIR}/${JAR_FILE} --server.tomcat.max-threads=50"]
+        resources:
+          limits:
+            memory: {{ patient_service_max_container_memory }}
+            cpu: {{ patient_service_max_cpus }}
+          requests:
+            memory: {{ patient_service_min_container_memory }}
+            cpu: {{ patient_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/patient-service/patient-service-{{ image_versions.cmx_patient_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ patient_service_min_heap_size }}", "-Xmx{{ patient_service_max_heap_size }}", "/opt/tools/patient-service/patient-service-{{ image_versions.cmx_patient_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_patient_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_patient_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_patient_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_patient_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: PATIENT_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: patientservice-database
+                key: dburl
+          - name: PATIENT_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: patientservice-database
+                key: dbusername
+          - name: PATIENT_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: patientservice-database
+                key: dbpassword
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+
+          # DB Connection pool properties
+          - name: PATIENT_SERVICE_DB_INITIAL_SIZE
+            value: "{{ patient_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: PATIENT_SERVICE_DB_MAX_WAIT
+            value: "{{ patient_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: PATIENT_SERVICE_DB_MAX_ACTIVE
+            value: "{{ patient_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: PATIENT_SERVICE_DB_MAX_IDLE
+            value: "{{ patient_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: PATIENT_SERVICE_DB_MIN_IDLE
+            value: "{{ patient_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: patient-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: patient-service
+  minReplicas: {{ (kubernetes_hpa.patient_service.min_pods is defined) | ternary( kubernetes_hpa.patient_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.patient_service.max_pods is defined) | ternary( kubernetes_hpa.patient_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

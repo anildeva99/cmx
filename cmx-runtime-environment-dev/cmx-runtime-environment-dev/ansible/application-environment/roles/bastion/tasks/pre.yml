@@ -1,0 +1,58 @@
+---
+- name: Gather facts about the bastion host
+  community.aws.ec2_instance_info:
+    filters:
+      "tag:Environment": "{{ env }}"
+      "tag:Type": bastion_host
+      "instance-state-name": running
+    region: "{{ region }}"
+  register: application_bastion_host_facts
+
+- name: Add bastion host to the in-memory inventory
+  add_host:
+    ansible_ssh_private_key_file: "{{ bastion_host_ubuntu_private_key_path }}"
+    ansible_user: ubuntu
+    groups: [ "bastion" ]
+    name: "{{ instance.private_ip_address }}"
+  loop: "{{ application_bastion_host_facts.instances }}"
+  loop_control:
+    loop_var: instance
+  when: ('private_ip_address' in instance)
+
+- name: Gather facts about the ingress bastion host
+  community.aws.ec2_instance_info:
+    filters:
+      "tag:Environment": "{{ env }}"
+      "tag:Type": ingress_bastion_host
+      "instance-state-name": running
+    region: "{{ region }}"
+  register: ingress_bastion_host_facts
+
+- name: Add ingress bastion host to the in-memory inventory
+  add_host:
+    ansible_ssh_private_key_file: "{{ bastion_host_ubuntu_private_key_path }}"
+    ansible_user: ubuntu
+    groups: [ "ingress_bastion" ]
+    name: "{{ instance.private_ip_address }}"
+  loop: "{{ ingress_bastion_host_facts.instances }}"
+  loop_control:
+    loop_var: instance
+  when: ('private_ip_address' in instance)
+
+- name: "Generate ssh-<env>.cfg file to enable
+    driving ssh connections through bastion host"
+  vars:
+    bastion_host_facts: "{{ application_bastion_host_facts }}"
+  template:
+    dest: "{{ temp_directory }}/ssh-{{ env }}.cfg"
+    mode: 0640
+    src: ssh.cfg.j2
+
+- name: "Generate ssh-<env>-ingress.cfg file to enable
+    driving ssh connections through ingress bastion host"
+  vars:
+    bastion_host_facts: "{{ ingress_bastion_host_facts }}"
+  template:
+    dest: "{{ temp_directory }}/ssh-{{ env }}-ingress.cfg"
+    mode: 0640
+    src: ssh.cfg.j2

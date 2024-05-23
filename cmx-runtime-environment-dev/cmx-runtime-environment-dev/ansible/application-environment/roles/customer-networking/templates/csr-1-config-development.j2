@@ -1,0 +1,185 @@
+! #################################
+! # Begin Testing GRE configuration
+! #################################
+
+!crypto isakmp policy 10
+!  encr aes 256
+!  hash sha256
+!  authentication pre-share
+
+! crypto isakmp key password123xyz address 0.0.0.0
+
+! crypto ipsec transform-set xform esp-aes 256 esp-sha256-hmac
+!  mode transport
+
+!crypto ipsec profile test
+!   set transform-set xform
+
+!interface Tunnel0
+! ip address 172.24.0.1 255.255.255.0
+! no ip redirects
+! ip mtu 1400
+! ip tcp adjust-mss 1360
+!  tunnel source GigabitEthernet1
+!  tunnel destination 34.196.180.185
+!  tunnel mode gre ip
+!  tunnel key 1
+!  tunnel protection ipsec profile test
+!  ip summary-address eigrp 1 0.0.0.0 0.0.0.0
+
+!router eigrp 1
+!  network 172.24.0.0
+!  passive-interface default
+!  no passive-interface Tunnel0
+!  ! Added by PCD
+!  network {{ ingress_ip_range_prefix }}.101.0 0.0.0.255
+!  network {{ ingress_ip_range_prefix }}.102.0 0.0.0.255
+
+!!! ACL's should be enabled.
+!ip access-list extended internet
+!  permit esp any any
+!  permit udp any eq isakmp any
+!  permit udp any any eq isakmp
+!  permit udp any eq non500-isakmp any
+!  permit udp any any eq non500-isakmp
+!  permit tcp any any eq 22
+!  permit tcp any eq 22 any
+!  permit udp any eq bootps any eq bootpc
+!  permit udp any eq bootpc any eq bootps
+
+!interface GigabitEthernet1
+!  ip access-group internet in
+!  ip access-group internet out
+
+! ###############################
+! # End Testing GRE configuration
+! ###############################
+
+
+
+! #############################################
+! # Begin Testing CryptoMap based configuration
+! #############################################
+
+! # Create an ISAKMP policy for phase 1 (key exchange) negotiations for the L2L tunnel
+! crypto isakmp policy 10
+!   encr aes 256
+!   hash sha
+!   authentication pre-share
+!   group 2
+
+! # Configuring the pre-shared key and the remote peer address to match for the L2L tunnel
+! crypto isakmp key password123xyz address 34.196.180.185
+
+! # Configure ISAKMP client
+! crypto isakmp enable
+
+! # Create an IPSEC policy for phase 2 (data encryption) for the L2L tunnel
+! crypto ipsec transform-set test_aes256_sha_ts esp-aes 256 esp-sha-hmac
+!   mode tunnel
+
+! # Create access-control list for MGPO key exchange
+!  Create an ACL for the traffic to be encrypted. In this example, the traffic between  10.52.0.0/16 10.54.0.0/16
+!  is encrypted. The traffic which does not match the access list is unencrypted for the Internet.
+! ip access-list extended testing
+!   permit ip 10.52.0.0 0.0.255.255 10.54.0.0 0.0.255.255
+
+! # Creating the crypto map. Specify the peer address, transform set and ACL for split tunneling.
+! crypto map test_crypto_map 437 ipsec-isakmp
+!   set peer 34.196.180.185
+!   set transform-set test_aes256_sha_ts
+!   match address testing
+!   reverse-route
+
+! # Apply the crypto map on the outside interface (GigabitEthernet1)
+! interface GigabitEthernet1
+!   crypto map test_crypto_map
+
+! #############################################
+! # End Testing CryptoMap based configuration
+! #############################################
+
+
+! #################################################
+! # Begin Partners / MGPO Development configuration
+! #################################################
+
+! # Note: From the Partners side, connection will be made to 10.255.30.35
+
+! # Create an ISAKMP policy for phase 1 (key exchange) negotiations for the L2L tunnel
+crypto isakmp policy 10
+  encr aes 256
+  hash sha
+  authentication pre-share
+  group 2
+
+! # Configuring the pre-shared key and the remote peer address to match for the L2L tunnel
+crypto isakmp key {{ partners_vpn_tunnel_preshared_key }} address {{ partners_vpn_peer_ip_address }}
+
+! # Enable ISAKMP on our interface
+crypto isakmp enable
+
+! # Create an IPSEC policy for phase 2 (data encryption) for the L2L tunnel
+crypto ipsec transform-set phs_aes256_sha_ts esp-aes 256 esp-sha-hmac
+  mode tunnel
+
+! Create an ACL for the traffic to be encrypted.
+! The traffic which does not match the access list is unencrypted for the Internet.
+ip access-list extended l2l02886
+{% for acl_entry in partners_crypto_acl_entries %}
+  permit ip host {{ partners_networking_ingress_mirth_ip }} {{ acl_entry }}
+{% endfor %}
+
+! # Creating the crypto map. Specify the peer address, transform set and ACL for split tunneling.
+crypto map shared_crypto_map 437 ipsec-isakmp
+  set peer {{ partners_vpn_peer_ip_address }}
+  set transform-set phs_aes256_sha_ts
+  match address l2l02886
+  reverse-route
+
+! ###############################################
+! # End Partners / MGPO Development configuration
+! ###############################################
+
+! #################################################
+! # Begin CU Medicine Onboarding configuration
+! #################################################
+
+! # Create an ISAKMP policy for phase 1 (key exchange) negotiations for the L2L tunnel
+crypto isakmp policy 11
+  encr aes 256
+  hash sha
+  authentication pre-share
+  group 2
+
+! # Configuring the pre-shared key and the remote peer address to match for the L2L tunnel
+crypto isakmp key {{ cumedicine_vpn_tunnel_preshared_key }} address {{ cumedicine_vpn_peer_ip_address }}
+
+! # Enable ISAKMP on our interface
+crypto isakmp enable
+
+! # Create an IPSEC policy for phase 2 (data encryption) for the L2L tunnel
+crypto ipsec transform-set cumed_aes256_sha_ts esp-aes 256 esp-sha-hmac
+  mode tunnel
+
+! Create an ACL for the traffic to be encrypted.
+! The traffic which does not match the access list is unencrypted for the Internet.
+ip access-list extended cumedtest
+{% for acl_entry in cumedicine_crypto_acl_entries %}
+  permit ip host {{ cumedicine_networking_ingress_mirth_ip }} {{ acl_entry }}
+{% endfor %}
+
+! # Creating the crypto map. Specify the peer address, transform set and ACL for split tunneling.
+crypto map shared_crypto_map 438 ipsec-isakmp
+  set peer {{ cumedicine_vpn_peer_ip_address }}
+  set transform-set cumed_aes256_sha_ts
+  match address cumedtest
+  reverse-route
+
+! ###############################################
+! # End CU Medicine Onboarding configuration
+! ###############################################
+
+! # Apply the crypto map on the outside interface (GigabitEthernet1)
+interface GigabitEthernet1
+  crypto map shared_crypto_map

@@ -1,0 +1,25 @@
+---
+developers:
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: BrianMottershead
+    email: brian@codametrix.com
+  - name: PhilCadigan
+    email: pcadigan@codametrix.com
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: DebbieWalker
+    email: debbie@codametrix.com
+  - name: SrinivasPandrangi
+    email: srinivas@codametrix.com
+  - name: YaraBudway
+    email: yara@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+
+bastion_additional_users: []

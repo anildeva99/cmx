@@ -1,0 +1,67 @@
+{% if enable_customer_networking %}
+##########
+# Partners
+
+# Partners routes back to CSR
+{% for cidr_block in partners_route_cidr_blocks %}
+resource "aws_route" "ingress_private_route_customer_csr_1_partners_{{ cidr_block.index }}" {
+  route_table_id            = aws_route_table.ingress_private_route_table.id
+  destination_cidr_block    = "{{ cidr_block.cidr }}"
+  network_interface_id      = aws_network_interface.customer_networking_csr_1_private_interface[0].id
+}
+{% endfor %}
+
+resource "aws_secretsmanager_secret" "partners_vpn_secret" {
+  name = "CodaMetrixApplication/CustomerVPN/${var.environment}-partners"
+  description = "Secret for VPN connection with Partners"
+  kms_key_id = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.partners_vpn_secret_recovery_window_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "partners_vpn_secret"
+      Name = "CodaMetrix Application SecretsManager - partners_vpn_secret"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "partners_vpn_secret_version" {
+  secret_id = aws_secretsmanager_secret.partners_vpn_secret.id
+  secret_string = "abc123"
+}
+
+#############
+# CU Medicine
+#############
+
+# CU Medicine routes back to CSR
+{% for cidr_block in cumedicine_route_cidr_blocks %}
+resource "aws_route" "ingress_private_route_customer_csr_1_cumedicine_{{ cidr_block.index }}" {
+  route_table_id            = aws_route_table.ingress_private_route_table.id
+  destination_cidr_block    = "{{ cidr_block.cidr }}"
+  network_interface_id      = aws_network_interface.customer_networking_csr_1_private_interface[0].id
+}
+{% endfor %}
+
+resource "aws_secretsmanager_secret" "cumedicine_vpn_secret" {
+  name = "CodaMetrixApplication/CustomerVPN/${var.environment}-cumedicine"
+  description = "Secret for VPN connection with CU Medicine"
+  kms_key_id = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.cumedicine_vpn_secret_recovery_window_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "cumedicine_vpn_secret"
+      Name = "CodaMetrix Application SecretsManager - cumedicine_vpn_secret"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "cumedicine_vpn_secret_version" {
+  secret_id = aws_secretsmanager_secret.cumedicine_vpn_secret.id
+  secret_string = "abc123"
+}
+
+{% endif %}

@@ -1,0 +1,40 @@
+---
+- name: Fail when ansible version incorrect
+  fail:
+    msg: "Ansible version incorrect, run: ../../scripts/setup.sh"
+  when: (ansible_version.full != current_ansible_version)
+
+- name: Get AWS account info and set aws_cli_account_id
+  block:
+    - name: Gather AWS account info
+      aws_caller_info:
+      register: aws_caller_info
+
+    - name: Set aws_cli_account_id fact
+      set_fact:
+        aws_cli_account_id: "{{ aws_caller_info.account }}"
+
+- name: Fail when var not defined
+  fail:
+    msg: "Variable '{{ var }}' is not defined, use -e <var>"
+  loop:
+    - "env"
+  loop_control:
+    loop_var: var
+  when: (var not in vars)
+
+- name: Include environ variables
+  include_vars:
+    dir: "{{ playbook_dir }}/environments/{{ env }}/group_vars/all"
+    extensions:
+      - "yml"
+
+- name: Fail when region not in regions
+  fail:
+    msg: "Region '{{ region }}' not supported '{{ regions }}'"
+  when: (region not in regions)
+
+- name: Fail when aws_cli_account_id != aws_account_id
+  fail:
+    msg: "aws_cli_account_id != aws_account_id"
+  when: (aws_cli_account_id != aws_account_id)

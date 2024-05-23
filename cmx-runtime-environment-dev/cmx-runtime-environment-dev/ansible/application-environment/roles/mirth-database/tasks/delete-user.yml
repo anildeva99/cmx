@@ -1,0 +1,25 @@
+---
+- name: Revoke access to all tables in the codametrix database
+  community.postgresql.postgresql_query:
+    db: "{{ mirth_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: >
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM {{ delete_user|lower }};
+      REVOKE ALL PRIVILEGES ON DATABASE {{ mirth_database_name }} FROM {{ delete_user|lower }};
+    ssl_mode: require
+  failed_when: false
+
+- name: Delete a single Postgres user (role) from Mirth database
+  community.general.postgresql_user:
+    db: "{{ mirth_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ mirth_database_admin_username }}"
+    name: "{{ delete_user|lower }}"
+    ssl_mode: require
+    state: absent

@@ -1,0 +1,633 @@
+{% if is_securityhub_account %}
+##################################################
+# Enable SecurityHub
+##################################################
+resource "aws_securityhub_account" "securityhub_account" {}
+
+##################################################
+# Subscribe to products
+##################################################
+resource "aws_securityhub_product_subscription" "application_securityhub_product_subscription" {
+  depends_on  = [aws_securityhub_account.securityhub_account]
+  product_arn = var.aws_securityhub_product_subscription_arn
+}
+
+resource "aws_securityhub_standards_subscription" "application_securityhub_standards_subscription" {
+  depends_on    = [aws_securityhub_account.securityhub_account]
+  standards_arn = var.aws_foundations_securityhub_standards_subscription_arn
+}
+{% endif %}
+
+{% if create_es_service_linked_role %}
+resource "aws_iam_service_linked_role" "application_elasticsearch_domain_service_linked_role" {
+  aws_service_name = "es.amazonaws.com"
+}
+{% endif %}
+
+{% if is_guardduty_member %}
+resource "aws_guardduty_invite_accepter" "member_accepter" {
+  detector_id       = aws_guardduty_detector.guardduty_detector.id
+  master_account_id = var.guardduty_master_account_id
+}
+{% endif %}
+
+{% if guardduty_detector_enable %}
+resource "aws_guardduty_detector" "guardduty_detector" {
+  enable = true
+}
+{% endif %}
+
+# ###########
+# Developers
+# ###########
+{% for developer in developers %}
+######################################################################################
+resource "aws_secretsmanager_secret" "application_developer_bastion_{{ env }}_{{ developer.name | lower }}_private_key_secret" {
+  name                    = "CodaMetrixApplication/Developers/bastion-host-{{ env }}-{{ developer.name | lower }}-id_ssh_rsa"
+  description             = "Bastion keypair for '{{ developer.name | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_developer_bastion_private_key_secret"
+      Name = "CodaMetrix Application SecretsManager - application_developer_bastion_private_key_secret"
+      DeveloperName = "{{ developer.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_developer_bastion_{{ env }}_{{ developer.name | lower }}_private_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.application_developer_bastion_{{ env }}_{{ developer.name | lower }}_private_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+
+resource "aws_secretsmanager_secret" "application_developer_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret" {
+  name                    = "CodaMetrixApplication/Developers/bastion-host-{{ env }}-{{ developer.name | lower }}-id_ssh_rsa.pub"
+  description             = "Bastion keypair for '{{ developer.name | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_developer_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret"
+      Name = "CodaMetrix Application SecretsManager - application_developer_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret"
+      DeveloperName = "{{ developer.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_developer_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.application_developer_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+
+###############################################################################################
+resource "aws_secretsmanager_secret" "application_developer_cluster_bastion_{{ env }}_{{ developer.name | lower }}_private_key_secret" {
+  name                    = "CodaMetrixApplication/Developers/cluster-bastion-{{ env }}-{{ developer.name | lower }}-id_ssh_rsa"
+  description             = "Cluster Bastion keypair for '{{ developer.name | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_developer_cluster_bastion_private_key_secret"
+      Name = "CodaMetrix Application SecretsManager - application_developer_cluster_bastion_private_key_secret"
+      DeveloperName = "{{ developer.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_developer_cluster_bastion_{{ env }}_{{ developer.name | lower }}_private_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.application_developer_cluster_bastion_{{ env }}_{{ developer.name | lower }}_private_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+
+resource "aws_secretsmanager_secret" "application_developer_cluster_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret" {
+  name                    = "CodaMetrixApplication/Developers/cluster-bastion-{{ env }}-{{ developer.name | lower }}-id_ssh_rsa.pub"
+  description             = "Cluster Bastion keypair for '{{ developer.name | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_developer_cluster_bastion_private_key_secret"
+      Name = "CodaMetrix Application SecretsManager - application_developer_cluster_bastion_private_key_secret"
+      DeveloperName = "{{ developer.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_developer_cluster_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.application_developer_cluster_bastion_{{ env }}_{{ developer.name | lower }}_public_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+# ########################
+# Bastion Additional Users
+# ########################
+{% for bastion_additional_user in bastion_additional_users %}
+######################################################################################
+resource "aws_secretsmanager_secret" "application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_private_key_secret" {
+  name                    = "CodaMetrixApplication/BastionAdditionalUsers/bastion-host-{{ env }}-{{ bastion_additional_user.name | lower }}-id_ssh_rsa"
+  description             = "Bastion keypair for '{{ bastion_additional_user.name | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_bastion_addl_user_private_key_secret"
+      Name = "CodaMetrix Application SecretsManager - application_bastion_addl_user_private_key_secret"
+      UserName = "{{ bastion_additional_user.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_private_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_private_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+
+resource "aws_secretsmanager_secret" "application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret" {
+  name                    = "CodaMetrixApplication/BastionAdditionalUsers/bastion-host-{{ env }}-{{ bastion_additional_user.name | lower }}-id_ssh_rsa.pub"
+  description             = "Bastion keypair for '{{ bastion_additional_user.name | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret"
+      Name = "CodaMetrix Application SecretsManager - application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret"
+      UserName = "{{ bastion_additional_user.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.application_bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+# ########################
+# Database Additional Users
+# ########################
+{% for database_additional_user in database_additional_users %}
+######################################################################################
+resource "aws_secretsmanager_secret" "application_database_addl_user_{{ database_additional_user | lower }}" {
+  name                    = "CodaMetrixApplication/DatabaseAdditionalUsers/{{ env }}-{{ database_additional_user | lower }}"
+  description             = "Database username and password for '{{ database_additional_user | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_database_addl_user_{{ database_additional_user | lower }}"
+      Name = "CodaMetrix Application SecretsManager - application_database_addl_user_{{ database_additional_user | lower }}"
+      UserName = "{{ database_additional_user | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_database_addl_user_{{ database_additional_user | lower }}_version" {
+  secret_id     = aws_secretsmanager_secret.application_database_addl_user_{{ database_additional_user | lower }}.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+# ###############################
+# Data Warehouse Additional Users
+# ###############################
+{% for data_warehouse_additional_user in data_warehouse_additional_users %}
+######################################################################################
+resource "aws_secretsmanager_secret" "application_data_warehouse_addl_user_{{ data_warehouse_additional_user | lower }}" {
+  name                    = "CodaMetrixApplication/DataWarehouseAdditionalUsers/{{ env }}-{{ data_warehouse_additional_user | lower }}"
+  description             = "Data Warehouse username and password for '{{ data_warehouse_additional_user | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_data_warehouse_addl_user_{{ data_warehouse_additional_user | lower }}"
+      Name = "CodaMetrix Application SecretsManager - application_data_warehouse_addl_user_{{ data_warehouse_additional_user | lower }}"
+      UserName = "{{ data_warehouse_additional_user | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_data_warehouse_addl_user_{{ data_warehouse_additional_user | lower }}_version" {
+  secret_id     = aws_secretsmanager_secret.application_data_warehouse_addl_user_{{ data_warehouse_additional_user | lower }}.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+{% for data_warehouse_additional_rw_user in data_warehouse_additional_rw_users %}
+######################################################################################
+resource "aws_secretsmanager_secret" "application_data_warehouse_addl_rw_user_{{ data_warehouse_additional_rw_user | lower }}" {
+  name                    = "CodaMetrixApplication/DataWarehouseAdditionalRWUsers/{{ env }}-{{ data_warehouse_additional_rw_user | lower }}"
+  description             = "Data Warehouse username and password for '{{ data_warehouse_additional_rw_user | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_data_warehouse_addl_rw_user_{{ data_warehouse_additional_rw_user | lower }}"
+      Name = "CodaMetrix Application SecretsManager - application_data_warehouse_addl_rw_user_{{ data_warehouse_additional_rw_user | lower }}"
+      UserName = "{{ data_warehouse_additional_rw_user | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_data_warehouse_addl_rw_user_{{ data_warehouse_additional_rw_user | lower }}_version" {
+  secret_id     = aws_secretsmanager_secret.application_data_warehouse_addl_rw_user_{{ data_warehouse_additional_rw_user | lower }}.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+{% for data_warehouse_additional_superuser in data_warehouse_additional_superusers %}
+######################################################################################
+resource "aws_secretsmanager_secret" "application_data_warehouse_addl_superuser_{{ data_warehouse_additional_superuser | lower }}" {
+  name                    = "CodaMetrixApplication/DataWarehouseAdditionalSuperUsers/{{ env }}-{{ data_warehouse_additional_superuser | lower }}"
+  description             = "Data Warehouse username and password for '{{ data_warehouse_additional_superuser | lower }}' in the '{{ env }}' application environment."
+  kms_key_id              = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_data_warehouse_addl_superuser_{{ data_warehouse_additional_superuser | lower }}"
+      Name = "CodaMetrix Application SecretsManager - application_data_warehouse_addl_superuser_{{ data_warehouse_additional_superuser | lower }}"
+      UserName = "{{ data_warehouse_additional_superuser | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_data_warehouse_addl_superuser_{{ data_warehouse_additional_superuser | lower }}_version" {
+  secret_id     = aws_secretsmanager_secret.application_data_warehouse_addl_superuser_{{ data_warehouse_additional_superuser | lower }}.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+# ##########
+# Inspector
+# ##########
+# If Inspector is enabled, dynamically create the resources
+{% if aws_inspector_enabled %}
+
+locals {
+  inspector_assessment_ruleset = compact([
+    var.ruleset_cve ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.aws_ruleset_cve_id}" : "",
+    var.ruleset_cis ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.aws_ruleset_cis_id}" : "",
+    var.ruleset_security_best_practices ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.ruleset_security_best_practices_id}" : "",
+    var.ruleset_network_reachability ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.ruleset_network_reachability_id}" : "",
+    ]
+  )
+}
+
+resource "aws_inspector_assessment_target" "inspector_accountwide_assessment" {
+  name  = "CMXApplication-${var.environment}-inspector_accountwide_assessment"
+}
+
+resource "aws_inspector_assessment_template" "inspector_accountwide_assessment_tmpl" {
+  name               = "CMXApplication-${var.environment}-inspector_accountwide_assessment_tmpl"
+  target_arn         = aws_inspector_assessment_target.inspector_accountwide_assessment.arn
+  duration           = var.inspector_assessment_duration
+  rules_package_arns = local.inspector_assessment_ruleset
+}
+
+resource "aws_cloudwatch_event_rule" "inspector_event_schedule" {
+  name                = "CMXApplication-${var.environment}-inspector_event_schedule"
+  description         = "Trigger an Inspector Assessment"
+  schedule_expression = var.inspector_schedule_expression
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "inspector_event_schedule"
+      Name = "CodaMetrix Inspector - inspector_event_schedule"
+    }
+  )
+}
+
+resource "aws_cloudwatch_event_target" "inspector_event_target" {
+  rule     = aws_cloudwatch_event_rule.inspector_event_schedule.name
+  arn      = aws_inspector_assessment_template.inspector_accountwide_assessment_tmpl.arn
+  role_arn = aws_iam_role.inspector_event_role.arn
+}
+
+############################################
+#  Inspector event role
+############################################
+resource "aws_iam_role" "inspector_event_role" {
+  name  = "CMXApplication-${var.environment}-inspector_event_role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "events.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "inspector_event_policy" {
+  name   = "CMXApplication-${var.environment}-inspector_event_policy"
+  role   = aws_iam_role.inspector_event_role.id
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "inspector:StartAssessmentRun"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+{% endif %}
+
+{% if vitalware_enabled %}
+resource "aws_secretsmanager_secret" "application_vitalware_api_secret" {
+  name = "CodaMetrixApplication/VitalwareAPI/${var.environment}"
+  description = "Credentials for Vitalware API in the '${var.environment}' application environment."
+  kms_key_id = aws_kms_key.application_secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_vitalware_api_secret"
+      Name = "CodaMetrix Application SecretsManager - application_vitalware_api_secret"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "application_vitalware_api_secret_version" {
+  secret_id = aws_secretsmanager_secret.application_vitalware_api_secret.id
+
+  secret_string = <<EOF
+{"username":"",
+"password":"",
+"api_key":""}
+EOF
+}
+
+resource "aws_iam_policy" "vitalware_secrets_usage_policy" {
+  name = "CodaMetrixApplication-${var.environment}-vitalware_secrets_usage_policy"
+  path = var.iam_resource_path
+  description = "This policy gives access to the Vitalware API secret"
+
+  policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:ListSecrets",
+        "secretsmanager:ListSecretVersionIds"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_secretsmanager_secret.application_vitalware_api_secret.arn}"
+      ]
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "vitalware_secrets_usage_policy_attachment" {
+  role = aws_iam_role.application_k8s_ext_secrets_role.name
+  policy_arn = aws_iam_policy.vitalware_secrets_usage_policy.arn
+}
+{% endif %}
+
+{% for data_lake_bucket in cross_account_data_lake_bucket %}
+# Data Lake Bucket Read-Only Policy from another account
+resource "aws_iam_policy" "application_{{ data_lake_bucket.short_name }}_cross_account_data_lake_bucket_readonly_policy" {
+  name = "CodaMetrixApplication-${var.environment}-{{ data_lake_bucket.bucket }}"
+  path = var.iam_resource_path
+  description = "This policy gives read-only access to the data lake bucket from another account"
+
+  policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:Get*",
+        "s3:List*"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+                    "arn:aws:s3:::{{ data_lake_bucket.bucket }}",
+                    "arn:aws:s3:::{{ data_lake_bucket.bucket }}/*"
+      ]
+    },
+    {
+      "Action": [
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+        "kms:DescribeKey"
+      ],
+      "Effect": "Allow",
+      "Resource": "{{ data_lake_bucket.key_alias_arn}}",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "kms:ViaService": [
+            "s3.${var.aws_region}.amazonaws.com"
+          ]
+        }
+      }
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "application_{{ data_lake_bucket.short_name }}_redshift_role_cross_account_data_lake_bucket_policy_attachment" {
+  role       = aws_iam_role.application_redshift_role.name
+  policy_arn = aws_iam_policy.application_{{ data_lake_bucket.short_name }}_cross_account_data_lake_bucket_readonly_policy.arn
+}
+{% endfor %}
+
+
+###################################################################
+#  Local variables of Elasticsearch index rotation
+###################################################################
+locals {
+  vpc_for_es_rotation_lambda = {
+    {% for key, value in elasticsearch_index_rotation.items() %}
+       {{ key }} =  {{ value.vpc_id }}
+    {% endfor %}
+  }
+
+  network_subnets_for_es_rotation_lambda = {
+    {% for key, value in elasticsearch_index_rotation.items() %}
+       {{ key }}  =  {{ value.subnet_id }}
+    {% endfor %}
+  }
+}
+
+{% if enable_rds_replication %}
+###################################################################
+#  Create RDS replica(s) in DR Region
+###################################################################
+
+# Create rds_replica region provider
+provider "aws" {
+  alias = "rds_replica"
+  region = "{{ dr_region }}"
+}
+
+# Create replica of  application_database in dr_region
+data "aws_kms_key" "application_database_dr" {
+  provider = aws.rds_replica
+  key_id = "alias/CodaMetrixApplication-${var.dr_environment}-application_database_key"
+}
+
+data "aws_security_group" "application_database_security_group" {
+  provider = aws.rds_replica
+  name = replace(aws_security_group.application_database_sg.name, var.environment, var.dr_environment)
+}
+
+module "application_database_replica" {
+  source                          = "./modules/rds-replica"
+  allocated_storage               = var.application_database_size
+  allow_major_version_upgrade     = false
+  auto_minor_version_upgrade      = true
+  copy_tags_to_snapshot           = true
+  db_subnet_group_name            = replace(var.application_database_subnet_group_name, var.environment, var.dr_environment)
+  deletion_protection             = var.application_database_deletion_protection
+  enabled_cloudwatch_logs_exports = var.application_database_enabled_cloudwatch_logs_exports
+  engine_version                  = var.application_database_version
+  identifier                      = "${var.application_database_identifier}-replica"
+  instance_class                  = var.application_database_instance_class
+  kms_key_arn                     = data.aws_kms_key.application_database_dr.arn
+  monitoring_interval             = var.application_database_monitoring_interval
+  monitoring_role_arn             = replace(aws_iam_role.rds_enhanced_monitoring.arn, var.environment, var.dr_environment)
+  multi_az                        = false
+  parameter_group_name            = replace(aws_db_parameter_group.application_database_parameter_group.name, var.environment, var.dr_environment)
+  source_db_arn                   = aws_db_instance.application_database.arn
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "application_database"
+      Name = "CodaMetrix Application - application_database_replica"
+    }
+  )
+  vpc_security_group_ids          = [data.aws_security_group.application_database_security_group.id]
+  providers = {
+    aws.replica = aws.rds_replica
+  }
+}
+
+# Create replica of  mirth_database in dr_region
+data "aws_kms_key" "mirth_database_dr" {
+  provider = aws.rds_replica
+  key_id = "alias/CodaMetrixApplication-${var.dr_environment}-mirth_database_key"
+}
+
+data "aws_security_group" "mirth_database_security_group" {
+  provider = aws.rds_replica
+  name = replace(var.mirth_database_security_group_name, var.environment, var.dr_environment)
+}
+
+module "mirth_database_replica" {
+  source                          = "./modules/rds-replica"
+  allocated_storage               = var.mirth_database_size
+  allow_major_version_upgrade     = false
+  auto_minor_version_upgrade      = true
+  copy_tags_to_snapshot           = true
+  db_subnet_group_name            = replace(var.mirth_database_subnet_group_name, var.environment, var.dr_environment)
+  deletion_protection             = var.mirth_database_deletion_protection
+  enabled_cloudwatch_logs_exports = var.mirth_database_enabled_cloudwatch_logs_exports
+  engine_version                  = var.mirth_database_version
+  identifier                      = "${var.mirth_database_identifier}-replica"
+  instance_class                  = var.mirth_database_instance_class
+  kms_key_arn                     = data.aws_kms_key.mirth_database_dr.arn
+  monitoring_interval             = var.mirth_database_monitoring_interval
+  monitoring_role_arn             = replace(aws_iam_role.rds_enhanced_monitoring.arn, var.environment, var.dr_environment)
+  multi_az                        = false
+  parameter_group_name            = replace(var.mirth_database_parameter_group, var.environment, var.dr_environment)
+  source_db_arn                   = module.mirth.mirth_database_arn
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "mirth_database"
+      Name = "CodaMetrix Application - mirth_database_replica"
+    }
+  )
+  vpc_security_group_ids          = [data.aws_security_group.mirth_database_security_group.id]
+  providers = {
+    aws.replica = aws.rds_replica
+  }
+}
+
+# Create replica of  ingress_mirth_database in dr_region
+data "aws_kms_key" "ingress_mirth_database_dr" {
+  provider = aws.rds_replica
+  key_id = "alias/CodaMetrixApplication-${var.dr_environment}-ingress_mirth_database_key"
+}
+
+data "aws_security_group" "ingress_mirth_database_security_group" {
+  provider = aws.rds_replica
+  name = replace(var.ingress_mirth_database_security_group_name, var.environment, var.dr_environment)
+}
+
+module "ingress_mirth_database_replica" {
+  source                          = "./modules/rds-replica"
+  allocated_storage               = var.ingress_mirth_database_size
+  allow_major_version_upgrade     = false
+  auto_minor_version_upgrade      = true
+  copy_tags_to_snapshot           = true
+  db_subnet_group_name            = replace(var.ingress_mirth_database_subnet_group_name, var.environment, var.dr_environment)
+  deletion_protection             = var.mirth_database_deletion_protection
+  enabled_cloudwatch_logs_exports = var.mirth_database_enabled_cloudwatch_logs_exports
+  engine_version                  = var.mirth_database_version
+  identifier                      = "${var.ingress_mirth_database_identifier}-replica"
+  instance_class                  = var.ingress_mirth_database_instance_class
+  kms_key_arn                     = data.aws_kms_key.ingress_mirth_database_dr.arn
+  monitoring_interval             = var.mirth_database_monitoring_interval
+  monitoring_role_arn             = replace(aws_iam_role.rds_enhanced_monitoring.arn, var.environment, var.dr_environment)
+  multi_az                        = false
+  parameter_group_name            = replace(var.ingress_mirth_database_parameter_group, var.environment, var.dr_environment)
+  source_db_arn                   = module.ingress_mirth.mirth_database_arn
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "mirth_database"
+      Name = "CodaMetrix Application - mirth_database_replica"
+    }
+  )
+  vpc_security_group_ids          = [data.aws_security_group.ingress_mirth_database_security_group.id]
+  providers = {
+    aws.replica = aws.rds_replica
+  }
+}
+{% endif %}

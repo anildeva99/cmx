@@ -1,0 +1,104 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Generate local configurations for the Customer Router
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: customer-networking
+        tasks_from: pre.yml
+
+    - name: Build local configuration
+      import_role:
+        name: customer-networking
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for bastion host, ubuntu
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+    - name: Create temporary private key file for Customer Routers, ec2-user
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_customerrouter_private_key }}"
+        localhost_key_path_var: "{{ customerrouter_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure Customer Routers
+  hosts: customerrouters
+  gather_facts: false
+  vars:
+    # Definitely prefer the first configuration,
+    # but it doesn't seem to want to work.
+    #ansible_ssh_common_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    ansible_ssh_common_args: >
+      -o ProxyCommand="ssh -i {{ bastion_host_ubuntu_private_key_path }}
+      -o StrictHostKeyChecking=no
+      -q
+      -A ubuntu@bastion.{{ env }}.trafficcop.codametrix.com nc %h %p"
+    state: present
+    csr_domain: "{{ env }}.trafficcop.codametrix.com"
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+
+    - name: Prep Customer Router 1
+      vars:
+        csr_name: csr-1
+        cmx_customerrouter_private_eni_facts: "{{ hostvars['localhost']['cmx_customerrouter_1_private_eni_facts'] }}"
+        partners_vpn_tunnel_preshared_key: "{{ hostvars['localhost']['partners_vpn_tunnel_preshared_key'] }}"
+        cumedicine_vpn_tunnel_preshared_key: "{{ hostvars['localhost']['cumedicine_vpn_tunnel_preshared_key'] }}"
+        yale_vpn_tunnel_preshared_key: "{{ hostvars['localhost']['yale_vpn_tunnel_preshared_key'] }}"
+      import_role:
+        name: customer-networking
+        tasks_from: configure-csr.yml
+
+- name: Delete temporary files
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Delete temporary private key file for ubuntu on the bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml
+
+    - name: Delete temporary private key file for ec2-user on the Customer Routers
+      vars:
+        localhost_temporary_key_path_var: "{{ customerrouter_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml

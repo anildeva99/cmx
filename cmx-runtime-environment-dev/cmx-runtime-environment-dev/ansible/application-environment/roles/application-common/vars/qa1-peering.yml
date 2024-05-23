@@ -1,0 +1,15 @@
+# Peering connections for the qa1 environment
+
+application_peer_vpc_routes:
+  - pcx_name: CMXQa1App-CMXQa1Ingress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.56.0.0/16
+  - pcx_name: ToolsNet-CMXQa1 # Tools Network <-> QA1
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: DataCentral2-CMXQa1Application # Data Central 2 <-> Development
+    destination_cidr: 10.72.0.0/16
+
+ingress_peer_vpc_routes:
+  - pcx_name: CMXQa1App-CMXQa1Ingress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.55.0.0/16
+  - pcx_name: ToolsNet-CMXQa1Ingress # Tools Network <-> QA1 Ingress
+    destination_cidr: "{{ codametrix_tools_cidr }}"

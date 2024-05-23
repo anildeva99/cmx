@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+kubectl config get-contexts | tail -n +2 | sed s/\*// | awk -F$' ' '{print $1}' | uniq | sort
+echo ""
+echo "Current Context: " $(kubectl config current-context)

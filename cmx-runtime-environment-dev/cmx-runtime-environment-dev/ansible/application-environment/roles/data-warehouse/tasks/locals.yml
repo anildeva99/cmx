@@ -1,0 +1,6 @@
+---
+- name: Generate update-redshift-password-<env>.sh from template
+  template:
+    dest: "{{ temp_directory }}/update-redshift-password-{{ env }}.sh"
+    mode: 0750
+    src: update-redshift-password.sh.j2

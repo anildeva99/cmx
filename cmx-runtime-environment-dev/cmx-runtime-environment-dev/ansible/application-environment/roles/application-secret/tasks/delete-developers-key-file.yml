@@ -1,0 +1,10 @@
+---
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Delete temporary key file for developers
+  file:
+    mode: 0600
+    path: "{{ temp_directory }}/{{ key_catagory_var }}-{{ env }}-{{ var.name|lower }}-{{ key_suffix }}"
+    state: absent
+  loop: "{{ developers_var }}"
+  loop_control:
+    loop_var: var

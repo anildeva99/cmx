@@ -1,0 +1,30 @@
+
+# SSH Config file, used for connections to/through the bastion host
+# Bastion host
+Host {% for instance in bastion_host_facts.instances %}{% if 'private_ip_address' in instance %}{{ instance.private_ip_address }}{% endif %}{% endfor %}
+
+ProxyCommand none
+
+User ubuntu
+
+IdentityFile {{ bastion_host_ubuntu_private_key_path }}
+
+# All other hosts
+Host *
+
+# Security
+ForwardAgent no
+
+# Connection multiplexing
+ControlMaster auto
+
+ControlPersist 2m
+
+ControlPath ~/.ssh/ansible-%C
+
+# Connect through bastion hosts
+#ProxyCommand ssh -i {{ bastion_host_ubuntu_private_key_path }} -o StrictHostKeyChecking=no -W %h:%p -q ubuntu@{% for instance in bastion_host_facts.instances %}{% if 'private_ip_address' in instance %}{{ instance.private_ip_address }}{% endif %}{% endfor %}
+
+ProxyCommand ssh -i {{ bastion_host_ubuntu_private_key_path }} -o StrictHostKeyChecking=no -q -A ubuntu@{% for instance in bastion_host_facts.instances %}{% if 'private_ip_address' in instance %}{{ instance.private_ip_address }}{% endif %}{% endfor %} nc %h %p
+
+IdentityFile {{ bastion_host_ubuntu_private_key_path }}

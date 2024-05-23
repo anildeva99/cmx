@@ -1,0 +1,56 @@
+---
+- name: Add postgres database for each microservice
+  community.general.postgresql_db:
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    maintenance_db: "{{ application_database_name }}"
+    name: "{{ service }}"
+    ssl_mode: "require"
+    state: "{{ state }}"
+  loop: "{{ services }}"
+  loop_control:
+    loop_var: service
+
+- name: Set timezone to UTC for each microservice DB
+  community.postgresql.postgresql_query:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_user: "{{ application_database_admin_username }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    query: "ALTER DATABASE {{ service }} SET timezone TO 'UTC';"
+    ssl_mode: require
+  loop: "{{ services }}"
+  loop_control:
+    loop_var: service
+  when: (state == 'present')
+
+- name: Add postgres user (role) for each microservice
+  community.general.postgresql_user:
+    db: "{{ service }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    name: "{{ service }}"
+    no_password_changes: true
+    priv: "CREATE/CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+  loop: "{{ services }}"
+  loop_control:
+    loop_var: service
+
+- name: Enable the tablefunc module for each microservice database
+  community.postgresql.postgresql_query:
+    db: "{{ service }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: "CREATE EXTENSION IF NOT EXISTS tablefunc;"
+    ssl_mode: require
+  loop: "{{ services }}"
+  loop_control:
+    loop_var: service
+  when: (state == 'present')

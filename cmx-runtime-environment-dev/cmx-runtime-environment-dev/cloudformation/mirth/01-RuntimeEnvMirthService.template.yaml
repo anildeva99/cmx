@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configure S3 Buckets for the Data Repository.
+Mappings: {}
+Parameters:
+  ParamEnvironment:
+    AllowedValues:
+      - tools
+      - sandbox
+      - development
+      - stage
+      - production
+    Description: Deployment Environment
+    Type: String
+    Default: tools
+Resources:
+  MirthIngestBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "mirth-ingest.${ParamEnvironment}.app.codametrix.com"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "aws:kms"
+      Tags:
+        - Key: Name
+          Value: !Sub "mirth-ingest.${ParamEnvironment}.app.codametrix.com"
+
+  MirthDictionariesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "mirth-dictionaries.${ParamEnvironment}.app.codametrix.com"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "aws:kms"
+      Tags:
+        - Key: Name
+          Value: !Sub "mirth-dictionaries.${ParamEnvironment}.app.codametrix.com"
+
+  MirthIngestBucketAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "MirthIngestBucket-AccessPolicy"
+      Path: /
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:List*
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub 'arn:aws:s3:::mirth-ingest.${ParamEnvironment}.app.codametrix.com'
+              - !Sub 'arn:aws:s3:::mirth-ingest.${ParamEnvironment}.app.codametrix.com/*'
+          - Effect: Allow
+            Action:
+              - s3:List*
+              - s3:PutObject
+            Resource:
+              - !Sub 'arn:aws:s3:::mirth-ingest.${ParamEnvironment}.app.codametrix.com/processed/'
+              - !Sub 'arn:aws:s3:::mirth-ingest.${ParamEnvironment}.app.codametrix.com/processed/*'
+          - Effect: Deny
+            Action:
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub 'arn:aws:s3:::mirth-ingest.${ParamEnvironment}.app.codametrix.com/processed/'
+              - !Sub 'arn:aws:s3:::mirth-ingest.${ParamEnvironment}.app.codametrix.com/processed/*'
+
+  MirthDictionariesBucketAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: "MirthDictionariesBucket-AccessPolicy"
+      Path: /
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:List*
+              - s3:GetObject
+              - s3:DeleteObject
+              - s3:PutObject
+            Resource:
+              - !Sub 'arn:aws:s3:::mirth-dictionaries.${ParamEnvironment}.app.codametrix.com'
+              - !Sub 'arn:aws:s3:::mirth-dictionaries.${ParamEnvironment}.app.codametrix.com/*'
+          - Effect: Allow
+            Action:
+              - s3:List*
+              - s3:PutObject
+            Resource:
+              - !Sub 'arn:aws:s3:::mirth-dictionaries.${ParamEnvironment}.app.codametrix.com/processed/'
+              - !Sub 'arn:aws:s3:::mirth-dictionaries.${ParamEnvironment}.app.codametrix.com/processed/*'
+          - Effect: Deny
+            Action:
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub 'arn:aws:s3:::mirth-dictionaries.${ParamEnvironment}.app.codametrix.com/processed/'
+              - !Sub 'arn:aws:s3:::mirth-dictionaries.${ParamEnvironment}.app.codametrix.com/processed/*'
+
+  #MirthIngestBucketAccessRole:
+  #  Type: AWS::IAM::Role
+  #  Properties:
+  #    AssumeRolePolicyDocument:
+  #      Version: 2012-10-17
+  #      Statement:
+  #        - Effect: Allow
+  #          Principal:
+  #            Service:
+  #              - ec2.amazonaws.com
+  #          Action:
+  #            - sts:AssumeRole
+  #    ManagedPolicyArns:
+  #      - !Ref MirthIngestBucketAccessPolicy
+  #    Path: /
+
+  MirthIngestUser:
+    Type: AWS::IAM::User
+    Properties:
+      ManagedPolicyArns:
+        - !Ref MirthIngestBucketAccessPolicy
+      Path: /cmxapplication/
+
+  MirthDictionariesUser:
+    Type: AWS::IAM::User
+    Properties:
+      ManagedPolicyArns:
+        - !Ref MirthDictionariesBucketAccessPolicy
+      Path: /cmxapplication/
+
+Outputs:
+  MirthIngestBucket:
+    Value: !GetAtt 'MirthIngestBucket.Arn'
+    Export:
+      Name: !Sub '${AWS::StackName}-MirthIngestBucket'
+  MirthIngestBucketAccessPolicy:
+    Value: !Ref MirthIngestBucketAccessPolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-MirthIngestBucketAccessPolicy'
+  MirthIngestUser:
+    Value: !GetAtt 'MirthIngestUser.Arn'
+    Export:
+      Name: !Sub '${AWS::StackName}-MirthIngestUser'
+
+  MirthDictionariesBucket:
+    Value: !GetAtt 'MirthDictionariesBucket.Arn'
+    Export:
+      Name: !Sub '${AWS::StackName}-MirthDictionariesBucket'
+  MirthDictionariesBucketAccessPolicy:
+    Value: !Ref MirthDictionariesBucketAccessPolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-MirthDictionariesBucketAccessPolicy'
+  MirthDictionariesUser:
+    Value: !GetAtt 'MirthDictionariesUser.Arn'
+    Export:
+      Name: !Sub '${AWS::StackName}-MirthDictionariesUser'

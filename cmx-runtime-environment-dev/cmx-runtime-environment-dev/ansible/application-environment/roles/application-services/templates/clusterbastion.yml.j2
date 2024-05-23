@@ -1,0 +1,123 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-bastion-startup-script
+data:
+  script: "{{ lookup('template', 'clusterbastion-startup.sh.j2') }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-bastion-authorized-keys
+data:
+  authorized_keys: "{{ lookup('file', '{{ cluster_bastion_private_key_path }}.pub') }}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-bastion-authorized-developer-keys
+data:
+{% for developer in developers %}
+  {% set devlower = developer.name | lower %}
+  {% set pubkey = temp_directory + "/cluster-bastion-" + env + "-" + devlower + "-id_ssh_rsa.pub" %}
+  "{{devlower}}": '{{ lookup("file", pubkey) }}'
+{% endfor %}
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cluster-bastion
+  labels:
+    app: cluster-bastion
+spec:
+  selector:
+    app: cluster-bastion
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_cluster_bastion }}
+    targetPort: {{ service_ports.cmx_cluster_bastion }}
+
+---
+# !!! Note: Currently cmx-bastion-host is based off of a publicly available image, this should be chagned before prod.
+# https://github.com/cloudposse/bastion
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-bastion
+  labels:
+    app: cluster-bastion
+    version: {{ image_versions.cmx_bastion_host }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-bastion
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: cluster-bastion
+        version: {{ image_versions.cmx_bastion_host }}
+      annotations:
+        readiness.status.sidecar.istio.io/applicationPorts: "{{ container_ports.cmx_cluster_bastion }}"
+    spec:
+      volumes:
+      - name: cluster-bastion-startup-script-volume
+        configMap:
+          name: cluster-bastion-startup-script
+          defaultMode: 0555
+
+      - name: cluster-bastion-authorized-keys-volume
+        configMap:
+          name: cluster-bastion-authorized-keys
+
+      - name: cluster-bastion-authorized-developer-keys-volume
+        configMap:
+          name: cluster-bastion-authorized-developer-keys
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-bastion-host:{{ image_versions.cmx_bastion_host }}
+        imagePullPolicy: {{ cmx_cluster_bastion_image_pull_policy }}
+        name: cluster-bastion
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        volumeMounts:
+          - name: cluster-bastion-startup-script-volume
+            mountPath: /startup.sh
+            subPath: script
+            readOnly: true
+
+          - name: cluster-bastion-authorized-keys-volume
+            mountPath: /home/bastion/.ssh/authorized_keys
+            subPath: authorized_keys
+            readOnly: true
+
+{% for developer in developers %}
+          - name: cluster-bastion-authorized-developer-keys-volume
+            mountPath: "/home/bastion/{{ developer.name | lower }}-public_key"
+            subPath: "{{ developer.name | lower }}"
+            readOnly: false
+{% endfor %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_cluster_bastion }}
+            name: ssh
+            protocol: TCP
+        readinessProbe:
+          tcpSocket:
+            port: {{ container_ports.cmx_cluster_bastion }}
+          initialDelaySeconds: 5

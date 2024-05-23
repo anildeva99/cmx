@@ -1,0 +1,198 @@
+{% if is_securityhub_account %}
+##################################################
+# Enable SecurityHub
+##################################################
+resource "aws_securityhub_account" "securityhub_account" {}
+
+##################################################
+# Subscribe to products
+##################################################
+resource "aws_securityhub_product_subscription" "securityhub_product_subscription" {
+  depends_on  = [aws_securityhub_account.securityhub_account]
+  product_arn = var.aws_securityhub_product_subscription_arn
+}
+
+resource "aws_securityhub_standards_subscription" "securityhub_standards_subscription" {
+  depends_on    = [aws_securityhub_account.securityhub_account]
+  standards_arn = var.aws_foundations_securityhub_standards_subscription_arn
+}
+{% endif %}
+
+{% if create_es_service_linked_role %}
+resource "aws_iam_service_linked_role" "elasticsearch_domain_service_linked_role" {
+  aws_service_name = "es.amazonaws.com"
+}
+{% endif %}
+
+{% if is_guardduty_member %}
+resource "aws_guardduty_invite_accepter" "member_accepter" {
+  detector_id       = aws_guardduty_detector.guardduty_detector.id
+  master_account_id = var.guardduty_master_account_id
+}
+{% endif %}
+
+{% if guardduty_detector_enable %}
+resource "aws_guardduty_detector" "guardduty_detector" {
+  enable = true
+}
+{% endif %}
+
+# ###########
+# Engineers
+# ###########
+{% for engineer in engineers %}
+######################################################################################
+resource "aws_secretsmanager_secret" "engineer_bastion_{{ env }}_{{ engineer.name | lower }}_private_key_secret" {
+  name                    = "CMXTrafficCop/Engineers/bastion-host-{{ env }}-{{ engineer.name | lower }}-id_ssh_rsa"
+  description             = "Bastion keypair for '{{ engineer.name | lower }}' in the '{{ env }}' environment."
+  kms_key_id              = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "engineer_bastion_private_key_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - engineer_bastion_private_key_secret"
+      EngineerName = "{{ engineer.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "engineer_bastion_{{ env }}_{{ engineer.name | lower }}_private_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.engineer_bastion_{{ env }}_{{ engineer.name | lower }}_private_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+
+resource "aws_secretsmanager_secret" "engineer_bastion_{{ env }}_{{ engineer.name | lower }}_public_key_secret" {
+  name                    = "CMXTrafficCop/Engineers/bastion-host-{{ env }}-{{ engineer.name | lower }}-id_ssh_rsa.pub"
+  description             = "Bastion keypair for '{{ engineer.name | lower }}' in the '{{ env }}' environment."
+  kms_key_id              = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "engineer_bastion_{{ env }}_{{ engineer.name | lower }}_public_key_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - engineer_bastion_{{ env }}_{{ engineer.name | lower }}_public_key_secret"
+      EngineerName = "{{ engineer.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "engineer_bastion_{{ env }}_{{ engineer.name | lower }}_public_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.engineer_bastion_{{ env }}_{{ engineer.name | lower }}_public_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+# ########################
+# Bastion Additional Users
+# ########################
+{% for bastion_additional_user in bastion_additional_users %}
+######################################################################################
+resource "aws_secretsmanager_secret" "bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_private_key_secret" {
+  name                    = "CMXTrafficCop/BastionAdditionalUsers/bastion-host-{{ env }}-{{ bastion_additional_user.name | lower }}-id_ssh_rsa"
+  description             = "Bastion keypair for '{{ bastion_additional_user.name | lower }}' in the '{{ env }}' environment."
+  kms_key_id              = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "bastion_addl_user_private_key_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - bastion_addl_user_private_key_secret"
+      UserName = "{{ bastion_additional_user.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_private_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_private_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+
+resource "aws_secretsmanager_secret" "bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret" {
+  name                    = "CMXTrafficCop/BastionAdditionalUsers/bastion-host-{{ env }}-{{ bastion_additional_user.name | lower }}-id_ssh_rsa.pub"
+  description             = "Bastion keypair for '{{ bastion_additional_user.name | lower }}' in the '{{ env }}' environment."
+  kms_key_id              = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = var.aws_secrets_recovery_window_in_days
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret"
+      Name = "CodaMetrix Traffic Cop SecretsManager - bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret"
+      UserName = "{{ bastion_additional_user.name | lower }}"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret_version" {
+  secret_id     = aws_secretsmanager_secret.bastion_addl_user_{{ env }}_{{ bastion_additional_user.name | lower }}_public_key_secret.id
+  secret_string = var.aws_secret_manager_secret_key_initial_value
+}
+{% endfor %}
+
+# ##########
+# Inspector
+# ##########
+# If Inspector is enabled, dynamically create the resources
+{% if aws_inspector_enabled %}
+locals {
+  inspector_assessment_ruleset = compact([
+    var.ruleset_cve ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.aws_ruleset_cve_id}" : "",
+    var.ruleset_cis ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.aws_ruleset_cis_id}" : "",
+    var.ruleset_security_best_practices ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.ruleset_security_best_practices_id}" : "",
+    var.ruleset_network_reachability ? "arn:aws:inspector:${var.aws_inspector_ruleset_region}:${var.aws_ruleset_account_id}:rulespackage/${var.ruleset_network_reachability_id}" : "",
+    ]
+  )
+}
+
+resource "aws_inspector_assessment_target" "inspector_accountwide_assessment" {
+  name  = "CMXTrafficCop-${var.environment}-inspector_accountwide_assessment"
+}
+
+resource "aws_inspector_assessment_template" "inspector_accountwide_assessment_tmpl" {
+  name               = "CMXTrafficCop-${var.environment}-inspector_accountwide_assessment_tmpl"
+  target_arn         = aws_inspector_assessment_target.inspector_accountwide_assessment.arn
+  duration           = var.inspector_assessment_duration
+  rules_package_arns = local.inspector_assessment_ruleset
+}
+
+resource "aws_cloudwatch_event_rule" "inspector_event_schedule" {
+  name                = "CMXTrafficCop-${var.environment}-inspector_event_schedule"
+  description         = "Trigger an Inspector Assessment"
+  schedule_expression = var.inspector_schedule_expression
+
+  tags = merge(
+    var.shared_resource_tags,
+    {
+      Type = "inspector_event_schedule"
+      Name = "CodaMetrix Inspector - inspector_event_schedule"
+    }
+  )
+}
+
+resource "aws_cloudwatch_event_target" "inspector_event_target" {
+  rule     = aws_cloudwatch_event_rule.inspector_event_schedule.name
+  arn      = aws_inspector_assessment_template.inspector_accountwide_assessment_tmpl.arn
+  role_arn = aws_iam_role.inspector_event_role.arn
+}
+{% endif %}
+
+###################################################################
+#  Elasticsearch index rotation locals
+###################################################################
+locals {
+  vpc_for_es_rotation_lambda = {
+    {% for key, value in elasticsearch_index_rotation.items() %}
+       {{ key }} =  {{ value.vpc_id }}
+    {% endfor %}
+  }
+
+  network_subnets_for_es_rotation_lambda = {
+    {% for key, value in elasticsearch_index_rotation.items() %}
+       {{ key }}  =  {{ value.subnet_id }}
+    {% endfor %}
+  }
+}

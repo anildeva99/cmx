@@ -1,0 +1,285 @@
+---
+- name: Separate services (comma/whitespace ) to deploy
+  set_fact:
+    services_to_deploy: "{{ deploy_service|regex_findall('([^, ]+)') }}"
+
+- name: Clone cmx-deploy-config repo
+  git:
+    accept_hostkey: true
+    depth: 1
+    dest: "{{ temp_directory }}/cmx-deploy-config"
+    repo: git@github.com:CodaMetrix/cmx-deploy-config.git
+    version: "{{ deploy_config_branch }}"
+
+- name: Parse Service version(s)
+  vars:
+    file: "service-versions-{{ env }}.yml"
+  set_fact:
+    image_versions: "{{ lookup('file',
+      '{{ temp_directory }}/cmx-deploy-config/{{ file }}')|from_yaml }}"
+
+- name: Parse Mu Sagemaker settings
+  vars:
+    file: "mu-settings-{{ env }}.yml"
+  set_fact:
+    mu_sagemaker_settings: "{{ lookup('file',
+      '{{ temp_directory }}/cmx-deploy-config/{{ file }}')|from_yaml }}"
+
+- name: Remove cmx-deploy-config repo
+  file:
+    path: "{{ temp_directory }}/cmx-deploy-config"
+    state: absent
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Set service ConfigMap resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'serviceconfigmap.yml.j2') }}"
+    state: "{{ state }}"
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Set ExternalSecrets resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'externalsecrets.yml.j2') }}"
+    state: "{{ state }}"
+
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Set New Relic java agent ConfigMap resource state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'newrelic-javaagent-configmap.yml.j2') }}"
+    state: "{{ state }}"
+
+# TODO: [DEVOPS-395] Fold below service definitions
+# into a single module call that uses a loop
+# TODO: [DEVOPS-386] shorten varibles definitions
+# to be less than 80 char in below k8s calls
+
+# Apply kubernetes resources (userservice.yml.j2)
+# to deploy CodaMetrix user service
+- name: "Set user service resource states to {{ state }}
+    using image version {{ image_versions.cmx_user_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'userservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_user_service")
+
+# Apply kubernetes resources (monitorservice.yml.j2)
+# to deploy CodaMetrix monitor service
+- name: "Set monitor service resource states to {{ state }}
+    using image version {{ image_versions.cmx_monitor_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'monitorservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_monitor_service")
+
+# Apply kubernetes resources (processservice.yml.j2)
+# to deploy CodaMetrix process service
+- name: "Set process service resource states to {{ state }}
+    using image version {{ image_versions.cmx_process_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'processservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_process_service")
+
+# Apply kubernetes resources (configurationservice.yml.j2)
+# to deploy CodaMetrix configuration service
+- name: "Set configuration service resource states to {{ state }}
+    using image version {{ image_versions.cmx_configuration_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'configurationservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_configuration_service")
+
+# Apply kubernetes resources (claimservice.yml.j2)
+# to deploy CodaMetrix claim service
+- name: "Set claim service resource states to {{ state }}
+    using image version {{ image_versions.cmx_claim_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'claimservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_claim_service")
+
+# Apply kubernetes resources (dictionaryservice.yml.j2)
+# to deploy CodaMetrix dictionary service
+- name: "Set dictionary service resource states to {{ state }}
+    using image version {{ image_versions.cmx_dictionary_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'dictionaryservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_dictionary_service")
+
+# Apply kubernetes resources (documentationservice.yml.j2)
+# to deploy CodaMetrix documentation service
+- name: "Set documentation service resource states to {{ state }}
+    using image version {{ image_versions.cmx_documentation_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'documentationservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_documentation_service")
+
+# Apply kubernetes resources (importerservice.yml.j2)
+# to deploy CodaMetrix importer service
+- name: "Set importer service resource states to {{ state }}
+    using image version {{ image_versions.cmx_importer_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'importerservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_importer_service")
+
+# Apply kubernetes resources (orderservice.yml.j2)
+# to deploy CodaMetrix order service
+- name: "Set order service resource states to {{ state }}
+    using image version {{ image_versions.cmx_order_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'orderservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_order_service")
+
+# Apply kubernetes resources (patientservice.yml.j2)
+# to deploy CodaMetrix patient service
+- name: "Set patient service resource states to {{ state }}
+    using image version {{ image_versions.cmx_patient_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'patientservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_patient_service")
+
+# Apply kubernetes resources (eventdispatcher.yml.j2)
+# to deploy CodaMetrix event dispatcher
+- name: "Set event dispatcher resource states to {{ state }}
+    using image version {{ image_versions.cmx_event_dispatcher_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'eventdispatcherservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_event_dispatcher_service")
+
+# Apply kubernetes resources (casebuilder.yml.j2)
+# to deploy CodaMetrix case builder
+- name: "Set case builder resource states to {{ state }}
+    using image version {{ image_versions.cmx_case_builder_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'casebuilderservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_case_builder_service")
+
+# Apply kubernetes resources (dashboardui.yml.j2)
+# to deploy CodaMetrix Dashboard UI
+- name: "Set dashboard ui resource states to {{ state }}
+    using image version {{ image_versions.cmx_dashboard_ui }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'dashboardui.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_dashboard_ui")
+
+# Apply kubernetes resources (musagemakerservice.yml.j2)
+# to deploy Mu Sagemaker Service
+- name: "Set Mu Sagemaker service resource states to {{ state }}
+    using image version {{ image_versions.mu_sagemaker_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'musagemakerservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "mu_sagemaker_service")
+
+# Apply kubernetes resources (exporterservice.yml.j2)
+# to deploy CodaMetrix exporter
+- name: "Set exporter service resource states to {{ state }}
+    using image version {{ image_versions.cmx_exporter_service }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template', 'exporterservice.yml.j2') }}"
+    state: "{{ state }}"
+  loop: "{{ services_to_deploy }}"
+  loop_control:
+    loop_var: service
+  when: ("*" == service) or
+        (service == "cmx_exporter_service")

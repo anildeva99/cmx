@@ -1,0 +1,7 @@
+terraform {
+  backend "s3" {
+    bucket  = "{{ management_bucket }}"
+    key     = "terraform/aws-cross-account-access-{{ env }}/terraform.tfstate"
+    region  = "{{ region }}"
+  }
+}

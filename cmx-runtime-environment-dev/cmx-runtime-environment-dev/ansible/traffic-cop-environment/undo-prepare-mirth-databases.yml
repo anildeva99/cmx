@@ -1,0 +1,46 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Generate local configurations for Mirth database
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Apply preparatory configuration
+      import_role:
+        name: mirth-database
+        tasks_from: pre.yml
+
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+- name: Configure the database itself
+  hosts: bastion
+  gather_facts: false
+  vars:
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    state: absent
+  tasks:
+    - name: Clean the database (users, schemas, etc)
+      vars:
+        database_address: "{{ hostvars['localhost']['mirth_database_facts'].instances[0].endpoint.address }}"
+      import_role:
+        name: mirth-database
+        tasks_from: configure-database.yml

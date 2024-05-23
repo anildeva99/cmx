@@ -1,0 +1,199 @@
+---
+- name: Add postgres user (role) for each developer
+  community.general.postgresql_user:
+    db: "{{ application_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    name: "{{ dev.name|lower }}"
+    no_password_changes: true
+    priv: "CREATE/CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev
+
+- name: Add postgres user (role) for each additional user
+  community.general.postgresql_user:
+    db: "{{ application_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    name: "{{ addit_user|lower }}"
+    no_password_changes: true
+    priv: "CONNECT/TEMPORARY"
+    ssl_mode: require
+    state: "{{ state }}"
+  loop: "{{ database_additional_users }}"
+  loop_control:
+    loop_var: addit_user
+
+- name: Grant select only to all additional users
+  community.general.postgresql_privs:
+    database: "{{ addit_user_service[1] }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    objs: ALL_IN_SCHEMA
+    privs: SELECT
+    roles: "{{ addit_user_service[0]|lower }}"
+    ssl_mode: require
+    state: "{{ state }}"
+    type: table
+  loop: "{{ database_additional_users|product(services)|list }}"
+  loop_control:
+    loop_var: addit_user_service
+
+- name: "Assign service role to user {{ application_database_admin_username }}"
+  community.postgresql.postgresql_query:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: "GRANT {{ service }} TO {{ application_database_admin_username }};"
+    ssl_mode: require
+  loop: "{{ services }}"
+  loop_control:
+    loop_var: service
+  when: (state == 'present')
+
+- name: Assign service role to developers
+  community.postgresql.postgresql_query:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: "GRANT {{ dev_service[1] }} TO {{ dev_service[0].name|lower }};"
+    ssl_mode: require
+  loop: "{{ developers|product(services)|list }}"
+  loop_control:
+    loop_var: dev_service
+  when: (state == 'present')
+
+- name: Assign service role to additional users
+  community.postgresql.postgresql_query:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: "GRANT {{ addit_user_service[1] }} TO {{ addit_user_service[0]|lower }};"
+    ssl_mode: require
+  loop: "{{ database_additional_users|product(services)|list }}"
+  loop_control:
+    loop_var: addit_user_service
+  when: (state == 'present')
+
+- name: Assign service role to monitorservice user
+  community.postgresql.postgresql_query:
+    db: "{{ application_database_name }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    query: "GRANT CONNECT,TEMPORARY ON DATABASE {{ db }} TO monitorservice;"
+    ssl_mode: require
+  loop: "{{ monitor_service_additional_dbs }}"
+  loop_control:
+    loop_var: db
+  when: (state == 'present')
+
+- name: Grant select only to monitorservice user
+  community.general.postgresql_privs:
+    database: "{{ db }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    objs: ALL_IN_SCHEMA
+    privs: SELECT
+    roles: "monitorservice"
+    ssl_mode: require
+    state: "{{ state }}"
+    type: table
+  loop: "{{ monitor_service_additional_dbs }}"
+  loop_control:
+    loop_var: db
+
+# Logic for superuser access below this line
+
+- name: Set dev_names fact
+  set_fact:
+    dev_names: "{{ developers|map(attribute='name')|list }}"
+
+- name: Allow CREATEDB,CREATEROLE to database_superusers
+  community.general.postgresql_user:
+    db: "{{ application_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    fail_on_user: false
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    name: "{{ db_superuser|lower }}"
+    no_password_changes: true
+    role_attr_flags: CREATEDB,CREATEROLE
+    ssl_mode: require
+    state: present
+  loop: "{{ database_superusers }}"
+  loop_control:
+    loop_var: db_superuser
+  when: (state == "present") and
+        (db_superuser in dev_names)
+
+- name: Remove CREATEDB,CREATEROLE from non database_superusers
+  community.general.postgresql_user:
+    db: "{{ application_database_name }}"
+    encrypted: true
+    expires: "infinity"
+    fail_on_user: false
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    name: "{{ dev|lower }}"
+    no_password_changes: true
+    role_attr_flags: NOCREATEDB,NOCREATEROLE
+    ssl_mode: require
+    state: present
+  loop: "{{ dev_names }}"
+  loop_control:
+    loop_var: dev
+  when: (state == "present") and
+        (dev not in database_superusers)
+
+- name: Grant ALL privs to each service db to database_superusers
+  community.general.postgresql_privs:
+    database: "{{ db_superuser[1] }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    privs: ALL
+    roles: "{{ db_superuser[0]|lower }}"
+    ssl_mode: require
+    state: "{{ state }}"
+    type: database
+  loop: "{{ database_superusers|product(services)|list }}"
+  loop_control:
+    loop_var: db_superuser
+  when: (state == "present") and
+        (db_superuser in dev_names)
+
+- name: "Remove ALL privs from each service db for users
+    not in database_superusers"
+  community.general.postgresql_privs:
+    database: "{{ dev[1] }}"
+    login_host: "{{ database_address }}"
+    login_password: "{{ database_credentials.dbpassword }}"
+    login_user: "{{ application_database_admin_username }}"
+    privs: ALL
+    roles: "{{ dev[0]|lower }}"
+    ssl_mode: require
+    state: absent
+    type: database
+  loop: "{{ dev_names|product(services)|list }}"
+  loop_control:
+    loop_var: dev
+  when: (state == "present") and
+        (dev not in database_superusers)

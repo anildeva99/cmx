@@ -1,0 +1,60 @@
+---
+- name: Generate backend.tf (terraform) from template
+  template:
+    dest: "{{ terraform_path }}/backend.tf"
+    mode: 0640
+    src: terraform-backend.tf.j2
+
+- name: "Retrieve CodaMetrixApplication/Redis/{{ env }} from
+  Secret Manager as temporary variable"
+  set_fact:
+    elasticache_password_secret:  "{{ lookup('aws_secret',
+      'CodaMetrixApplication/Redis/' + env, errors='warn',
+      region=region) }}"
+
+- name: Generate terraform.tfvars from template
+  vars:
+    elasticache_password: "{{ temp_elasticache_password
+      if elasticache_password_secret|length == 0
+      else  elasticache_password_secret['redispassword'] }}"
+  template:
+    dest: "{{ terraform_path }}/terraform.tfvars"
+    mode: 0640
+    src: terraform.tfvars.j2
+
+- name: Generate dynamic resource file
+  template:
+    dest: "{{ terraform_path }}/dynamic_resources.tf"
+    mode: 0640
+    src: dynamic-resources.tf.j2
+
+- name: Delete customer_dynamic_resources.tf
+  file:
+    path: "{{ terraform_path }}/customer_dynamic_resources.tf"
+    state: absent
+
+- name: Generate customer dynamic resource file
+  template:
+    dest: "{{ terraform_path }}/customer_dynamic_resources.tf"
+    mode: 0640
+    src: customer-dynamic-resources.tf.j2
+  when: (enable_customer_networking)
+
+- name: Generate script to update the jwt key
+  template:
+    dest: "{{ temp_directory }}/update-app-jwt-key-{{ env }}.sh"
+    mode: 0750
+    src: update-app-jwt-key.sh.j2
+
+- name: Generate script to update the Vitalware credentials
+  template:
+    dest: "{{ temp_directory }}/update-vitalware-api-credentials-{{ env }}.sh"
+    mode: 0750
+    src: update-vitalware-api-credentials.sh.j2
+  when: (vitalware_enabled)
+
+- name: Generate script to update the SMTP credentials
+  template:
+    dest: "{{ temp_directory }}/update-smtp-credentials-{{ env }}.sh"
+    mode: 0750
+    src: update-smtp-credentials.sh.j2

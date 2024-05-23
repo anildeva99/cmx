@@ -1,0 +1,69 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: dashboard-ui
+  labels:
+    app: dashboard-ui
+spec:
+  selector:
+    app: dashboard-ui
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_dashboard_ui }}
+    targetPort: {{ container_ports.cmx_dashboard_ui }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-ui
+  labels:
+    app: dashboard-ui
+    version: {{ image_versions.cmx_dashboard_ui }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard-ui
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: dashboard-ui
+        version: {{ image_versions.cmx_dashboard_ui }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.dashboardui }}
+    spec:
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/ui-omnibus:{{ image_versions.cmx_dashboard_ui }}
+        imagePullPolicy: {{ cmx_dashboard_ui_image_pull_policy }}
+        name: dashboard-ui
+        resources:
+          limits:
+            memory: {{ dashboard_ui_max_container_memory }}
+            cpu: {{ dashboard_ui_max_cpus }}
+          requests:
+            memory: {{ dashboard_ui_min_container_memory }}
+            cpu: {{ dashboard_ui_min_cpus }}
+
+{% if enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_dashboard_ui }}
+            name: http
+            protocol: TCP
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map

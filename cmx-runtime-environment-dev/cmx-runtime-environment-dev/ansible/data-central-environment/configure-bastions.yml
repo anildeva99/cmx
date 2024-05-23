@@ -1,0 +1,76 @@
+---
+- name: Provision bastion host
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Apply preparatory configuration
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Configure the bastion host bastion keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_bastion_private_key }}"
+        aws_secret_private_key_path_var: "{{ bastion_host_bastion_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Create local files and configuration
+      import_role:
+        name: bastion
+        tasks_from: locals.yml
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: "Create temporary private key file for bastion
+        host ubuntu user with permissions"
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure bastion
+  hosts: bastion
+  gather_facts: false
+  vars:
+    state: present
+    ansible_ssh_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Apply changes to bastion host
+      import_role:
+        name: bastion
+        tasks_from: configure-bastion.yml
+
+- name: Perform cleanup tasks
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Delete temporary private key file for ubuntu user of bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: delete-temporary-key-file.yml

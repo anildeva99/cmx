@@ -1,0 +1,116 @@
+---
+- name: Run configuration tasks for DW DB
+  block:
+    - name: Check if cmx database exists
+      community.postgresql.postgresql_query:
+        db: "{{ application_data_warehouse_name }}"
+        login_host: "{{ dw_address }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        port: 5439
+        query: >
+          select 1 WHERE EXISTS (SELECT * FROM pg_database WHERE datname = 'cmx');
+        ssl_mode: require
+      register: cmx_output
+
+    - name: Check if customer databases exist
+      community.postgresql.postgresql_query:
+        db: "{{ application_data_warehouse_name }}"
+        login_host: "{{ dw_address }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        port: 5439
+        query: >
+          select 1 WHERE EXISTS (SELECT * FROM pg_database WHERE datname = '{{ system }}');
+        ssl_mode: require
+      loop: "{{ healthsystems }}"
+      loop_control:
+        loop_var: system
+      register: healthsystem_output
+
+    - name: Create cmx databases
+      community.postgresql.postgresql_query:
+        autocommit: true
+        db: "{{ application_data_warehouse_name }}"
+        login_host: "{{ dw_address }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        port: 5439
+        query: >
+          CREATE DATABASE cmx;
+        ssl_mode: require
+      when: (cmx_output.query_result|length == 0)
+
+    - name: Create customer databases
+      community.postgresql.postgresql_query:
+        autocommit: true
+        db: "{{ application_data_warehouse_name }}"
+        login_host: "{{ dw_address }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        port: 5439
+        query: >
+          CREATE DATABASE {{ sys_output.system }};
+        ssl_mode: require
+      loop: "{{ healthsystem_output.results }}"
+      loop_control:
+        loop_var: sys_output
+      when: (sys_output.query_result|length == 0)
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Create schemas in the default database
+      community.postgresql.postgresql_query:
+        db: "{{ application_data_warehouse_name }}"
+        login_host: "{{ dw_address }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        port: 5439
+        query: >
+          CREATE EXTERNAL SCHEMA IF NOT EXISTS spectrum_schema FROM DATABASE 'spectrum_schema_db' IAM_ROLE 'arn:aws:iam::{{ aws_account_id }}:role/{{ redshift_role }}' CREATE EXTERNAL DATABASE IF NOT EXISTS;
+          CREATE SCHEMA IF NOT EXISTS customer_views;
+          CREATE SCHEMA IF NOT EXISTS reports;
+
+          ALTER SCHEMA spectrum_schema OWNER TO {{ application_data_warehouse_admin_username }};
+          ALTER SCHEMA customer_views OWNER TO {{ application_data_warehouse_admin_username }};
+          ALTER SCHEMA reports OWNER TO {{ application_data_warehouse_admin_username }};
+        ssl_mode: require
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Create schemas in cmx database
+      community.postgresql.postgresql_query:
+        db: cmx
+        login_host: "{{ dw_address }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        port: 5439
+        query: >
+          CREATE EXTERNAL SCHEMA IF NOT EXISTS spectrum_schema FROM DATABASE 'spectrum_schema_db' IAM_ROLE 'arn:aws:iam::{{ aws_account_id }}:role/{{ redshift_role }}' CREATE EXTERNAL DATABASE IF NOT EXISTS;
+          CREATE SCHEMA IF NOT EXISTS customer_views;
+          CREATE SCHEMA IF NOT EXISTS reports;
+
+          ALTER SCHEMA spectrum_schema OWNER TO {{ application_data_warehouse_admin_username }};
+          ALTER SCHEMA customer_views OWNER TO {{ application_data_warehouse_admin_username }};
+          ALTER SCHEMA reports OWNER TO {{ application_data_warehouse_admin_username }};
+        ssl_mode: require
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Create schemas in customer databases
+      community.postgresql.postgresql_query:
+        db: "{{ system }}"
+        login_host: "{{ dw_address }}"
+        login_user: "{{ application_data_warehouse_admin_username }}"
+        login_password: "{{ dw_credentials.dbpassword }}"
+        port: 5439
+        query: >
+          CREATE EXTERNAL SCHEMA IF NOT EXISTS spectrum_schema FROM DATABASE 'spectrum_schema_db' IAM_ROLE 'arn:aws:iam::{{ aws_account_id }}:role/{{ redshift_role }}' CREATE EXTERNAL DATABASE IF NOT EXISTS;
+          CREATE SCHEMA IF NOT EXISTS customer_views;
+          CREATE SCHEMA IF NOT EXISTS reports;
+
+          ALTER SCHEMA spectrum_schema OWNER TO {{ application_data_warehouse_admin_username }};
+          ALTER SCHEMA customer_views OWNER TO {{ application_data_warehouse_admin_username }};
+          ALTER SCHEMA reports OWNER TO {{ application_data_warehouse_admin_username }};
+        ssl_mode: require
+      loop: "{{ healthsystems }}"
+      loop_control:
+        loop_var: system
+  when: (state == 'present')

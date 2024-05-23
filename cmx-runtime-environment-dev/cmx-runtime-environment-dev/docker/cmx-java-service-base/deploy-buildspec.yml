@@ -1,0 +1,21 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo Nothing to do in the install phase...
+  pre_build:
+    commands:
+      - echo Entered the pre_build phase
+      - LOGIN=$(aws ecr get-login --no-include-email); eval $LOGIN
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity | grep Account | sed -e 's/^[^0-9]*\([0-9]*\).*$/\1/g')
+      - aws s3 cp s3://buildpipeline.tools.codametrix.com/${PROJECT_NAME}/${ARTIFACT_NAME}-${ARTIFACT_VERSION}.tar ./${ARTIFACT_NAME}-${ARTIFACT_VERSION}.tar
+      - docker load -i ./$ARTIFACT_NAME-$ARTIFACT_VERSION.tar
+  build:
+    commands:
+      - echo Build started on `date`
+      - docker tag $ARTIFACT_NAME:$ARTIFACT_VERSION $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ARTIFACT_NAME:$ARTIFACT_VERSION
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/$ARTIFACT_NAME:$ARTIFACT_VERSION
+  post_build:
+    commands:
+      - echo Build completed on `date`

@@ -1,0 +1,30 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: '3.8'
+
+  pre_build:
+    commands:
+      - echo Installing Ansible...
+      - apt-get update
+      - apt-get install -y software-properties-common
+      - apt-add-repository ppa:ansible/ansible
+      - apt-get update
+      - apt-get install -y ansible
+      - pip install --user kubernetes
+      - pip install --user openshift
+      - pip install --user botocore
+      - pip install --user boto3
+
+      - echo Pull down kubeconfig file from S3...
+      - mkdir -p $HOME/.kube
+      - aws s3 cp s3://management.tools.codametrix.com/pki/CodeBuild/kubeconfig-$DEPLOY_ENV $HOME/.kube/config
+
+  build:
+    commands:
+      - cd $ANSIBLE_PLAYBOOK_DIR
+      - PYTHON=$(which python)
+      - echo "Python Interpreter " $PYTHON
+      - ansible-playbook -e ansible_python_interpreter=$PYTHON $ANSIBLE_PLAYBOOK_PARAMS

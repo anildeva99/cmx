@@ -1,0 +1,13 @@
+terraform {
+  required_version = "~> 0.12.24"
+  required_providers {
+    aws = "~> 3.30"
+    archive = "~> 1.2.0"
+  }
+
+  backend "s3" {
+    bucket  = "{{ management_bucket }}"
+    key     = "terraform/data-central-environment-{{ env }}/terraform.tfstate"
+    region  = "{{ region }}"
+  }
+}

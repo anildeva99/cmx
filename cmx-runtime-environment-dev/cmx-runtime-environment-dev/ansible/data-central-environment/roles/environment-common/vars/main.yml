@@ -1,0 +1,157 @@
+---
+# Override with the environment
+env: "{{ env }}"
+
+environment_dns_name: "{{ env }}.datacentral.codametrix.com"
+
+#Recovery Window for AWS Secrets
+aws_secrets_recovery_window_in_days: 30
+aws_secret_manager_secret_key_initial_value: INITIAL
+
+# Temporary directory
+temp_directory: "{{ lookup('env','HOME') }}/.codametrix/{{ env }}/tmp/"
+
+# SES identity and secret name (may be overridden if environment will
+# pull secret details from existing env)
+dundas_ses_identity: dundasbi
+dundas_ses_source_credentials_secret_name: "CodaMetrixDataCentral/Dundas/SES/{{ env }}-{{ dundas_ses_identity }}"
+
+database_temporary_password: "{{ lookup('randpass', '32', uppercase=10,
+  lowercase=10, digits=10) }}"
+
+environment_logs_bucket: "logs.{{env}}.datacentral.codametrix.com"
+environment_secrets_kms_key_alias: "alias/CodaMetrixDataCentral-{{ env }}-environment_secrets_key"
+dundas_secrets_kms_key_alias: "alias/CodaMetrixDataCentral-{{ env }}-dundas_secrets_key"
+dundas_application_database_identifier: "codametrixdatacentral-{{ env }}-dundas-application-db"
+dundas_warehouse_database_identifier: "codametrixdatacentral-{{ env }}-dundas-warehouse-db"
+
+bastion_host_ubuntu_private_key: "bastion-host-{{ env }}-ubuntu-id_ssh_rsa"
+bastion_host_ubuntu_private_key_path: "{{ temp_directory }}/{{ bastion_host_ubuntu_private_key }}"
+aws_secret_bastion_host_ubuntu_private_key: "CodaMetrixDataCentral/BastionHost/{{ bastion_host_ubuntu_private_key }}"
+bastion_host_bastion_private_key: "bastion-host-{{ env }}-bastion-id_ssh_rsa"
+bastion_host_bastion_private_key_path: "{{ temp_directory }}/{{ bastion_host_bastion_private_key }}"
+aws_secret_bastion_host_bastion_private_key: "CodaMetrixDataCentral/BastionHost/{{ bastion_host_bastion_private_key }}"
+dundas_private_key: "dundas-{{ env }}-id_ssh_rsa"
+dundas_config_secret_name: "CodaMetrixDataCentral/Dundas/config-{{ env }}"
+aws_secret_dundas_private_key: "CodaMetrixDataCentral/Dundas/{{ dundas_private_key }}"
+dundas_private_key_path: "{{ temp_directory }}/{{ dundas_private_key }}"
+
+public_key_suffix: "id_ssh_rsa.pub"
+
+sns_topics:
+  cloud_watch_alarm_topic: "CodaMetrixDataCentral-{{ env }}-cloud_watch_alarm_topic"
+cloud_watch_alarm_topic_display_name: "{{ sns_topics.cloud_watch_alarm_topic|replace('-', ' ') }}"
+
+default_dundas_config:
+  ADMIN_USER: "admin"
+  ADMIN_EMAIL: "devops@codametrix.com"
+  DB_USER: "{{ dundas_application_database_username }}"
+  DB_WAREHOUSE_USER: "{{ dundas_warehouse_database_username }}"
+  SMTP_SERVER: "email-smtp.us-east-1.amazonaws.com:587"
+  DB_PORT: "5432"
+  DB_WAREHOUSE_PORT: "5432"
+
+dundas_instance_role: "CodaMetrixDataCentral-{{ env }}-dundas_instance_role"
+
+bastion_host_key_name: "codametrixdatacentral-{{ env }}-bastion-host"
+dundas_key_name: "codametrixdatacentral-{{ env }}-dundas"
+
+dundas_application_database_subnet_group_name: "codametrixdatacentral-{{ env }}-dundas_application_db_subnet_group"
+dundas_warehouse_database_subnet_group_name: "codametrixdatacentral-{{ env }}-dundas_warehouse_db_subnet_group"
+
+acl_constraint_body_size: 25600 # 25K, for imports.
+acl_constraint_cookie_size: 4093
+acl_constraint_query_string_size: 1024
+acl_constraint_uri_size: 512
+web_admin_url: "/admin"
+acl_constraint_match_auth_tokens: .TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
+acl_constraint_session_id: example-session-id
+
+env_vpc_flow_log_group_name: "CodaMetrixDataCentral-{{ env }}-VPCFlowLogGroup"
+env_vpc_flow_log_traffic_type: ALL
+
+aws_inspector_enabled: true
+inspector_schedule_expression: "cron(0 14 ? * THU *)" # Run every Thursday at 2PM UTC/9AM EST/10AM EDT
+inspector_assessment_duration: "3600" # 1 hour
+ruleset_cve: true
+ruleset_cis: true
+ruleset_security_best_practices: true
+ruleset_network_reachability: true
+inspector_enable_scheduled_event: true
+aws_inspector_ruleset_region: "{{ region }}"
+aws_ruleset_account_id: "316112463485"
+aws_ruleset_cve_id: "0-gEjTy7T7"
+aws_ruleset_cis_id: "0-rExsr2X8"
+ruleset_security_best_practices_id: "0-R01qwB5Q"
+ruleset_network_reachability_id: "0-PmNV0Tcd"
+
+guardduty_detector_enable: true
+is_guardduty_member: true
+guardduty_master_account_id: "{{ codametrix_tools_account_id }}"
+emr_bootstrap_action_name: emr_cluster_installing_aws_inspector_agent
+emr_bootstrap_script_file_path: scripts/emr_bootstrap_script.sh
+
+# Security Hub
+is_securityhub_account: false
+aws_foundations_securityhub_standards_subscription_arn: "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0"
+aws_securityhub_product_subscription_arn: "arn:aws:securityhub:{{ region }}:733251395267:product/alertlogic/althreatmanagement"
+
+####################
+#  CloudWatch Alarms
+####################
+free_storage_metrix_name: FreeStorageSpace
+percentage_disk_space_used_metrix_name: PercentageDiskSpaceUsed
+less_than_or_equal_to_comparison_operator: LessThanOrEqualToThreshold
+greater_than_comparison_operator: GreaterThanThreshold
+statistic_period: 60
+treat_missing_data:
+  missing: missing
+  ignore: ignore
+  breaching: breaching
+  notBreaching: notBreaching
+
+# In terraform we cannot mix string and map as element of map, and I don't want to repeat them in
+# each set of parameter in alarms, so single them out.
+cloudwatch_alarm_namespace:
+  ec2: AWS/EC2
+  rds: AWS/RDS
+  elastic_search: AWS/ES
+  redshift: AWS/Redshift
+
+dundas_server_liveness_threshold: 0
+
+########################
+#  AWS KMS key rotation
+########################
+enable_key_rotation: true
+
+##############################
+# Security groups
+##############################
+# By default allow access to the bastion from the CodaMetrix Tools VPN
+bastion_ingress_from_cidr_sgs: []
+bastion_ingress_from_sg_sgs:
+  - description: Allow SSH access from the CodaMetrix Tools VPN
+    from_port: 22
+    to_port: 22
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"
+  - description: Allow proxy connections for Cognito from the CodaMetrix Tools VPN
+    from_port: 10000
+    to_port: 10050
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"
+
+# By default allow access to the Dundas ALB from the CodaMetrix Tools VPN
+alb_dundas_ingress_from_cidr_sgs: []
+alb_dundas_ingress_from_sg_sgs:
+  - description: Allow HTTPS access from the CodaMetrix Tools VPN
+    from_port: 443
+    to_port: 443
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"
+  - description: Allow HTTP access from the CodaMetrix Tools VPN
+    from_port: 80
+    to_port: 80
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"

@@ -1,0 +1,263 @@
+---
+# Override with the traffic cop environment
+env: "{{ env }}"
+
+# current supported ansible version
+current_ansible_version: "2.10.4"
+
+# global supported regions
+regions:
+  - "us-east-1"
+  - "us-west-2"
+
+# CodaMetrix account ID (standard ECR repository location)
+codametrix_tools_account_id: "643073444324"
+sso_login_account_id: "643073444324"
+
+# CodaMetrix Tools environment stuff
+codametrix_tools_vpn_sg: "sg-048b872f81382cb63"
+codametrix_tools_cidr: "10.11.0.0/16"
+
+# Latest CodaMetrix Runtime Environment Bastion version 1.1 AMI's
+bastion_amis:
+  us-east-1: ami-0f0170284be5cfae5
+
+# Mirth AMIs (Ubuntu 18.04 LTS, [October, 2020])
+mirth_amis:
+  us-east-1: ami-0db2f077c671ef596
+
+peer_vpc_routes: []
+
+mirth_database_multi_az: false
+mirth_database_enabled_cloudwatch_logs_exports: []
+mirth_database_name: mirthdb
+mirth_database_admin_username: root
+mirth_database_username: mirthdb
+mirth_database_schema_name: mirth
+
+# Mirth database max connecctions
+mirth_db_max_connections: 100
+
+rds_certificate_bundle_url: https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
+rds_certificate_bundle_path: /usr/local/share/ca-certificates/rds-combined-ca-bundle.crt
+
+###########
+# Terraform
+###########
+# Override to 'true' to force terraform initialization
+force_init: true
+terraform_path: ../../terraform/traffic-cop-environment
+keypair_terraform_path: ../../terraform/traffic-cop-ssh-keypair
+
+elasticsearch_instance_type: r5.large.elasticsearch
+elasticsearch_instance_count: 1
+elasticsearch_dedicated_master_enabled: false
+elasticsearch_zone_awareness_enabled: false
+
+######################################
+#  Traffic from other places to mirth
+######################################
+mirth_additional_open_ports: []
+
+# Mirth
+mirth_processing_indicator: T
+
+environment_dns_name: "{{ env }}.trafficcop.codametrix.com"
+mirthconnect_dns_address: "mirth.{{ environment_dns_name }}"
+
+#Recovery Window for AWS Secrets
+aws_secrets_recovery_window_in_days: 30
+aws_secret_manager_secret_key_initial_value: INITIAL
+secrets_kms_key_alias: "alias/CMXTrafficCop-{{ env }}-secrets_key"
+
+#Dynamic Resources
+create_es_service_linked_role: true
+
+# Temporary directory
+temp_directory: "{{ lookup('env','HOME') }}/.codametrix/{{ env }}/tmp/"
+
+# Which branch to get the service versions from
+deploy_config_branch: master
+
+database_temporary_password: "{{ lookup('randpass', '32', uppercase=10,
+  lowercase=10, digits=10) }}"
+
+logs_bucket: "logs.{{ env }}.trafficcop.codametrix.com"
+
+elasticsearch_domain: "cmx-{{ env }}-es-domain"
+
+bastion_host_ubuntu_private_key: "bastion-host-{{ env }}-ubuntu-id_ssh_rsa"
+bastion_host_ubuntu_private_key_path: "{{ temp_directory }}/{{ bastion_host_ubuntu_private_key }}"
+aws_secret_bastion_host_ubuntu_private_key: "CMXTrafficCop/BastionHost/{{ bastion_host_ubuntu_private_key }}"
+bastion_host_bastion_private_key: "bastion-host-{{ env }}-bastion-id_ssh_rsa"
+bastion_host_bastion_private_key_path: "{{ temp_directory }}/{{ bastion_host_bastion_private_key }}"
+aws_secret_bastion_host_bastion_private_key: "CMXTrafficCop/BastionHost/{{ bastion_host_bastion_private_key }}"
+public_key_suffix: "id_ssh_rsa.pub"
+
+sns_topics:
+  cloud_watch_alarm_topic:
+    name: "CMXTrafficCop-{{ env }}-cloud_watch_alarm_topic"
+    display_name: "CMXTrafficCop {{ env }} cloud_watch_alarm_topic"
+  kibana_alarm_topic:
+    name: "CMXTrafficCop-{{ env }}-kibana_alarm_topic"
+    display_name: "CMXTrafficCop {{ env }} kibana_alarm_topic"
+
+bastion_host_key_name: "cmxtrafficcop-{{ env }}-bastion-host"
+
+customerrouter_key_name: "cmxtrafficcop-{{ env }}-customer-router"
+customerrouter_private_key: "customerrouter-{{ env }}-id_ssh_rsa"
+customerrouter_private_key_path: "{{ temp_directory }}/{{ customerrouter_private_key }}"
+aws_secret_customerrouter_private_key: "CMXTrafficCop/CustomerRouter/{{ customerrouter_private_key }}"
+customerrouter_login_username: ec2-user
+
+restart_mirth: false
+mirth_key_name: "cmxtrafficcop-{{ env }}-mirth"
+mirth_ubuntu_private_key: "mirth-{{ env }}-ubuntu-id_ssh_rsa"
+mirth_ubuntu_private_key_path: "{{ temp_directory }}/{{ mirth_ubuntu_private_key }}"
+aws_secret_mirth_ubuntu_private_key: "CMXTrafficCop/Mirth/{{ mirth_ubuntu_private_key }}"
+mirth_login_username: ubuntu
+
+mirth_database_secrets_usage_policy_name: "CMXTrafficCop-{{ env }}-mirth_database_secrets_usage_policy"
+mirth_database_identifier: "cmxtrafficcop-{{ env }}-mirth-db"
+mirth_role_name: "CMXTrafficCop-{{ env }}-mirth_role"
+mirth_database_subnet_group_name: "cmxtrafficcop-{{ env }}-mirth_db_subnet_group"
+mirth_database_kms_key_alias: "alias/CMXTrafficCop-{{ env }}-mirth_database_key"
+mirth_database_parameter_group: "cmxtrafficcop-{{ env }}-mirth-parameter-group"
+mirth_database_secret_name: "CMXTrafficCop/Mirth/{{ env }}"
+mirth_database_admin_secret_name: "CMXTrafficCop/MirthDatabaseAdmin/{{ env }}"
+mirth_database_security_group_name: "CMXTrafficCop-{{env}}-mirth_database_sg"
+mirth_rds_enhanced_monitoring_role_name: "CMXTrafficCop-{{ env }}-mirth-rds-enhanced-monitoring"
+
+vpc_flow_log_group_name: "CMXTrafficCop-{{ env }}-VPCFlowLogGroup"
+vpc_flow_log_traffic_type: ALL
+aws_inspector_enabled: true
+inspector_schedule_expression: "cron(0 14 ? * THU *)" # Run every Thursday at 2PM UTC/9AM EST/10AM EDT
+inspector_assessment_duration: "3600" # 1 hour
+ruleset_cve: true
+ruleset_cis: true
+ruleset_security_best_practices: true
+ruleset_network_reachability: true
+inspector_enable_scheduled_event: true
+aws_inspector_ruleset_region: "{{ region }}"
+aws_ruleset_account_id: "316112463485"
+aws_ruleset_cve_id: "0-gEjTy7T7"
+aws_ruleset_cis_id: "0-rExsr2X8"
+ruleset_security_best_practices_id: "0-R01qwB5Q"
+ruleset_network_reachability_id: "0-PmNV0Tcd"
+
+guardduty_detector_enable: true
+is_guardduty_member: true
+guardduty_master_account_id: "{{ codametrix_tools_account_id }}"
+
+# Security Hub
+is_securityhub_account: true
+aws_foundations_securityhub_standards_subscription_arn: "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0"
+aws_securityhub_product_subscription_arn: "arn:aws:securityhub:{{ region }}:733251395267:product/alertlogic/althreatmanagement"
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+log_subscription_filter_distribution: "Random"
+kinesis_rentention_period: 24
+kinesis_stream_kms_key_alias: "alias/aws/kinesis"
+firehose_cloudwatch_log_retention: 7
+firehose_lambda_runtime_type: "python2.7"
+firehose_lambda_function_timeout: 300
+firehose_elasticsearch_configuration_buffering_interval: 60
+firehose_elasticsearch_configuration_buffering_size: 1
+firehose_s3_backup_bucket_configuration_buffering_interval: 60
+firehose_s3_backup_bucket_configuration_buffering_size: 2
+firehose_s3_backup_bucket_configuration_prefix: "cw_ingest_to_es_by_firehose-"
+firehose_s3_config_cloudwatch_logging_options_enabled: true
+firehose_s3_config_cloudwatch_logging_options_log_group_name: "kinesis_firehose"
+firehose_s3_config_cloudwatch_logging_options_log_stream_name: "kinesis_firehose"
+firehose_elasticsearch_configuration_s3_backup_mode: "FailedDocumentsOnly"
+firehose_elasticsearch_configuration_index_rotation_period: "OneDay"
+firehose_record_lambda_func_processing_configuration_enabled: true
+firehose_record_processors_type: "Lambda"
+firehose_processor_parameter_name: "LambdaArn"
+
+####################
+#  CloudWatch Alarms
+####################
+free_storage_metrix_name: FreeStorageSpace
+percentage_disk_space_used_metrix_name: PercentageDiskSpaceUsed
+less_than_or_equal_to_comparison_operator: LessThanOrEqualToThreshold
+greater_than_comparison_operator: GreaterThanThreshold
+statistic_period: 60
+treat_missing_data:
+  missing: missing
+  ignore: ignore
+  breaching: breaching
+  notBreaching: notBreaching
+
+# In terraform we cannot mix string and map as element of map, and I don't want to repeat them in
+# each set of parameter in alarms, so single them out.
+cloudwatch_alarm_namespace:
+  rds: AWS/RDS
+  elasticsearch: AWS/ES
+  redshift: AWS/Redshift
+  ec2: AWS/EC2
+  emr: AWS/ElasticMapReduce
+
+# By default, set thresholds for Mirth and the VPN to 0
+mirth_alarms_enabled: false
+mirth_liveness_threshold: 0
+mirth_network_throughput_threshold: 0
+customerrouter_liveness_threshold: 0
+customerrouter_network_throughput_threshold: 0
+
+########################
+#  AWS KMS key rotation
+########################
+enable_key_rotation: true
+
+#################
+# Security groups
+#################
+# By default allow access to the bastion from the CodaMetrix Tools VPN
+bastion_ingress_from_cidr_sgs: []
+bastion_ingress_from_sg_sgs:
+  - description: Allow SSH access from the CodaMetrix Tools VPN
+    from_port: "22"
+    to_port: "22"
+    protocol: tcp
+    source_security_group_id: "{{ codametrix_tools_vpn_sg }}"
+
+# By default allow access to mirth connect from the CodaMetrix Tools network
+mirth_connect_api_ingress_from_sg_sgs: []
+mirth_connect_api_ingress_from_cidr_sgs:
+  - description: Allow HTTPS from the CodaMetrix Tools network
+    from_port: "8443"
+    to_port: "8443"
+    protocol: tcp
+    cidr_blocks:
+      - "{{ codametrix_tools_cidr }}"
+
+# Backup s3 bucket for elasticsearch
+elasticsearch_index_rotation:
+  trafficcop:
+    domain_address: "elasticsearch.{{ env }}.trafficcop.codametrix.com"
+    bucket: "es-bkup.{{ env }}.trafficcop.codametrix.com" # Note: bucket name doubles as the ES repository name
+    cron_schedule_for_snapshot: "cron(15 23 * * ? *)"
+    cron_schedule_for_deleting_indices: "cron(15 1 * * ? *)"
+    s3_bucket_lifecycle_standard_infrequent_access_date: 30
+    vpc_id: aws_vpc.vpc.id
+    subnet_id: aws_subnet.private_subnet_1.id
+    indices:
+      - regex_pattern: "^(mirth-postgresql)"
+        kind: regex
+        days_to_keep: 30
+      - regex_pattern: cloudtrail-
+        kind: prefix
+        days_to_keep: 90
+
+elasticsearch_index_rotation_lambda:
+  lambda_function_dir: files/elasticsearch_lambda_function_build
+  memory_size: 128
+  timeout: 300
+  pkg_path_source_code: elasticsearch_lambda_function
+  pkg_function_name: rotate_elasticsearch_index_lambda
+  pkg_runtime: python2.7
+
+new_relic_temporary_license_key: "INITIAL"

@@ -1,0 +1,7 @@
+---
+- name: "Set keypair state to {{ state }}"
+  community.general.terraform:
+    force_init: "{{ force_init }}"
+    project_path: "{{ keypair_terraform_path }}"
+    state: "{{ state }}"
+    variables_file: terraform.tfvars

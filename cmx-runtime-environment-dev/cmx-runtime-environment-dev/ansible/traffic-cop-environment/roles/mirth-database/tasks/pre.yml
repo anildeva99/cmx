@@ -1,0 +1,7 @@
+---
+- name: Gather facts about the Mirth database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ mirth_database_identifier }}"
+    region: "{{ region }}"
+  register: mirth_database_facts

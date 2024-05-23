@@ -1,0 +1,12 @@
+---
+- name: Generate backend.tf (terraform) from template
+  template:
+    dest: "{{ keypair_terraform_path }}/backend.tf"
+    mode: 0600
+    src: keypair-terraform-backend.tf.j2
+
+- name: Generate terraform.tfvars from template for keypair directory
+  template:
+    dest: "{{ keypair_terraform_path }}/terraform.tfvars"
+    mode: 0600
+    src: keypair_terraform.tfvars.j2

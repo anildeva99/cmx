@@ -1,0 +1,78 @@
+---
+region: us-east-1
+management_bucket: management.development.app.vobasolutions.com
+env: development
+
+foreign_accounts:
+  - "843902778531" # legacy sandbox
+  - "441219382285" # legacy stage
+  - "097524411557" # cmx onboarding
+  - "718323977716" # cmx test
+  - "733943117466" # cmx stage
+  - "606837856353" # cmx production
+  - "804152217010" # cmx ml research
+
+# ECR repos that will be enabled for cross-account access
+ecr_repos: []
+
+# S3 Buckets that access will be given to.
+s3_buckets:
+  sagemaker.development.mu.codametrix.com:
+    - bucket_object_spec: "*"
+      bucket_object_actions:
+        - s3:GetObject
+      bucket_actions:
+        - s3:ListBucket
+      foreign_account:
+        - "843902778531"
+        - "441219382285"  # !!! Note: Temporary - used for testing stage ACT Gateway integration with the data lake
+        - "097524411557"
+        - "718323977716"
+        - "733943117466"
+        - "606837856353"
+    - bucket_object_spec: "*"
+      bucket_object_actions:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:PutObjectAcl
+      bucket_actions:
+        - s3:ListBucket
+      foreign_account:
+        - "804152217010"
+
+  data-lake.development.application.codametrix.com: # !!! Note: Temporary - used for testing stage ACT Gateway integration with the data lake
+    - bucket_object_spec: "icm/*"
+      bucket_object_actions:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:PutObjectAcl
+      bucket_actions:
+        - s3:ListBucket
+      foreign_account:
+        - "843902778531"
+        - "441219382285"  # !!! Note: Temporary - used for testing stage ACT Gateway integration with the data lake
+        - "097524411557"
+        - "718323977716"
+        - "733943117466"
+        - "606837856353"
+
+kms_keys:
+  - key_alias: "alias/MuDevelopmentResources-{{ env }}-sagemaker_kms_key"
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey
+      - GenerateDataKey
+
+  - key_alias: "alias/CodaMetrixApplication-{{ env }}-mu_sagemaker_ephemeral_storage_key"
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey
+
+  - key_alias: "alias/CodaMetrixApplication-{{ env }}-application_data_lake_emr_kms_key" # !!! Note: Temporary - used for testing stage ACT Gateway integration with the data lake
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey
+      - GenerateDataKey

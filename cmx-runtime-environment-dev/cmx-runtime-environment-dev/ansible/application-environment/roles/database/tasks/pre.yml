@@ -1,0 +1,7 @@
+---
+- name: Gather facts about the application database
+  community.aws.rds_instance_info:
+    filters:
+      "db-instance-id": "{{ application_database_identifier }}"
+    region: "{{ region }}"
+  register: app_db_facts

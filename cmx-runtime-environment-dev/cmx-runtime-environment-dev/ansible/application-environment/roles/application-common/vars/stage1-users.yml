@@ -1,0 +1,86 @@
+---
+developers:
+  - name: BrianMottershead
+    email: brian@codametrix.com
+  - name: CarolinePierce
+    email: caroline@codametrix.com
+  - name: CreightonLynch
+    email: creighton@codametrix.com
+  - name: DebbieWalker
+    email: debbie@codametrix.com
+  - name: EliOlson
+    email: eli@codametrix.com
+  - name: JeffreyTaylor
+    email: jeffrey@codametrix.com
+  - name: JeffToussaint
+    email: jtoussaint@codametrix.com
+  - name: JeffWoodward
+    email: woody@codametrix.com
+  - name: JoelRegen
+    email: joel@codametrix.com
+  - name: JoyeeWinifredLeoV
+    email: joyee@codametrix.com
+  - name: KasiMusunuri
+    email: kasi@codametrix.com
+  - name: KeithGrohbrugge
+    email: keith@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: MattDemoy
+    email: matt@codametrix.com
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MikeLane
+    email: mlane@codametrix.com
+  - name: PhilCadigan
+    email: pcadigan@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: RichardTrevorrow
+    email: rtrevorrow@codametrix.com
+  - name: RobCosta
+    email: rob@codametrix.com
+  - name: SayyaraRajapova
+    email: sayyara@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+  - name: SrinivasPandrangi
+    email: srinivas@codametrix.com
+  - name: SureshKumar
+    email: suresh@codametrix.com
+  - name: ToniAbrams
+    email: toni@codametrix.com
+  - name: YaraBudway
+    email: yara@codametrix.com
+
+# Ops Users
+ops_users:
+  # Jenkins Build User
+  - userarn: "arn:aws:iam::{{ codametrix_tools_account_id }}:user/CodametrixTools-tools-BuildUser"
+    username: build-user
+    group: system:masters
+
+bastion_additional_users:
+  - name: KellyKeene
+    email: kelly@codametrix.com
+
+database_additional_users:
+  - KellyKeene
+
+database_superusers: []
+
+data_warehouse_additional_users:
+  - DundasBI
+
+data_warehouse_additional_rw_users:
+  - WarehouseLoader
+
+data_warehouse_additional_superusers:
+  - MikeBaglioSuperuser
+  - BrianMottersheadSuperuser
+  - SrinivasPandrangi
+
+data_lake_additional_users: []

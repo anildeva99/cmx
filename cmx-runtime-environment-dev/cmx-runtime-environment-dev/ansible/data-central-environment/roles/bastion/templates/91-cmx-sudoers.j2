@@ -1,0 +1,7 @@
+{% for developer in developers %}
+{% if (developer.bastion_sudo is defined) and (developer.bastion_sudo|bool == True) %}
+# User rules for {{ developer.name | lower }}
+{{ developer.name | lower }} ALL=(ALL) NOPASSWD:ALL
+
+{% endif %}
+{% endfor %}

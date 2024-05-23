@@ -1,0 +1,8 @@
+---
+peer_vpc_routes:
+  - pcx_name: DataCentral2-CMXDevelopmentApplication # Development
+    destination_cidr: 10.51.0.0/16
+  - pcx_name: ToolsNet-DataCentral2 # Tools Network <-> Data Central 2
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+  - pcx_name: DataCentral2-CMXDevelopmentApplication # QA1
+    destination_cidr: 10.51.0.0/16

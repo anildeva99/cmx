@@ -1,0 +1,6 @@
+---
+- name: Generate script to update the mirth passwords/secrets
+  template:
+    dest: "{{ temp_directory }}/update-mirth-db-passwords-{{ env }}.sh"
+    mode: 0750
+    src: update-mirth-db-password.sh.j2

@@ -1,0 +1,418 @@
+---
+shortenv: "sndbxdr"
+region: us-west-2
+cmx_automate_dns_name: sandboxdr.codametrix.ai
+management_bucket: management.sandboxdr.codametrix.com
+region_specific_elb_hosted_zone_id: Z1H1FL5HABSF5
+
+# AWS Voba Sandbox account
+aws_account_name: legacysandbox
+aws_account_id: "843902778531"
+ip_range_prefix: "10.63"
+ingress_ip_range_prefix: "10.64"
+
+is_guardduty_member: false
+
+# !!! Remove this and replace with our own sagemaker-data bucket
+sagemaker_data_bucket: sagemaker.development.app.codametrix.com
+sagemaker_data_key_alias: MuDevelopmentResources-development-sagemaker_kms_key
+sagemaker_data_key_alias_arn: "arn:aws:kms:us-east-1:109882322034:alias/{{ sagemaker_data_key_alias }}"
+
+# Don't create Elastic Search service role link, it sandbox already does that
+create_es_service_linked_role: false
+
+# Inspector rules (needed because they are different for us-west-2)
+aws_ruleset_account_id: "758058086616"
+aws_ruleset_cve_id: "0-9hgA516p"
+aws_ruleset_cis_id: "0-H5hpSawc"
+ruleset_network_reachability_id: "0-rD1z6dpl"
+ruleset_security_best_practices_id: "0-JJOtZiqQ"
+
+# By default allow access to the application network bastion from the
+# CodaMetrix Tools VPN.
+# NOTE: Needs to be in CIDR form if in region us-west-2
+application_bastion_ingress_from_cidr_sgs:
+  - description: Allow SSH access from the CodaMetrix Tools VPN
+    from_port: "22"
+    to_port: "22"
+    protocol: tcp
+    cidr_blocks:
+      - "10.11.0.0/16"
+  - description: Allow proxy connections for Cognito from the CodaMetrix Tools VPN
+    from_port: "10000"
+    to_port: "10050"
+    protocol: tcp
+    cidr_blocks:
+      - "10.11.0.0/16"
+
+application_bastion_ingress_from_sg_sgs: []
+
+ingress_bastion_ingress_from_cidr_sgs:
+  - description: Allow SSH access from the CodaMetrix Tools VPN
+    from_port: "22"
+    to_port: "22"
+    protocol: tcp
+    cidr_blocks:
+      - "10.11.0.0/16"
+  - description: Allow proxy connections for Cognito from the CodaMetrix Tools VPN
+    from_port: "10000"
+    to_port: "10050"
+    protocol: tcp
+    cidr_blocks:
+      - "10.11.0.0/16"
+
+ingress_bastion_ingress_from_sg_sgs: []
+
+shared_resource_tags:
+  BillingCategory: Application
+  BillingTeam: Engineering
+  BillingEnvironment: Sandbox
+  BillingApplication: CMx
+  Environment: "{{ env }}"
+  Usage: CodaMetrix Application
+
+# Enable cluster bastion?
+enable_cluster_bastion: true
+
+# CodaMetrix Runtime Environment EKS version 1.16 AMI's
+node_amis:
+  us-west-2: ami-06e9c6c1784278b59
+
+# CodaMetrix Runtime Environment Bastion version 1.1 AMI's
+bastion_amis:
+  us-west-2: ami-004fe598784a165e8
+
+# Ingress Mirth AMIs (Ubuntu 18.04 LTS, [October, 2020])
+ingress_mirth_amis:
+  us-west-2: ami-0fe3d3827e45be389
+
+cmx_case_builder_service_spring_profile: dev
+cmx_case_builder_service_image_pull_policy: Always
+cmx_claim_service_spring_profile: dev
+cmx_claim_service_image_pull_policy: Always
+cmx_configuration_service_spring_profile: dev
+cmx_configuration_service_image_pull_policy: Always
+cmx_dashboard_ui_image_pull_policy: Always
+cmx_dictionary_service_spring_profile: dev
+cmx_dictionary_service_image_pull_policy: Always
+cmx_documentation_service_spring_profile: dev
+cmx_documentation_service_image_pull_policy: Always
+cmx_event_dispatcher_service_spring_profile: dev
+cmx_event_dispatcher_service_image_pull_policy: Always
+cmx_importer_service_spring_profile: dev
+cmx_importer_service_image_pull_policy: Always
+cmx_order_service_spring_profile: dev
+cmx_order_service_image_pull_policy: Always
+cmx_patient_service_spring_profile: dev
+cmx_patient_service_image_pull_policy: Always
+cmx_user_service_spring_profile: dev
+cmx_user_service_image_pull_policy: Always
+cmx_cluster_bastion_image_pull_policy: Always
+cmx_mirth_image_pull_policy: Always
+cmx_process_service_spring_profile: dev
+cmx_process_service_image_pull_policy: Always
+mu_sagemaker_service_spring_profile: default
+mu_sagemaker_service_image_pull_policy: Always
+cmx_exporter_service_spring_profile: dev
+cmx_exporter_service_image_pull_policy: Always
+
+###############################
+# Application service resources
+###############################
+case_builder_service_min_container_memory: "1Gi"
+case_builder_service_max_container_memory: "2Gi"
+case_builder_service_min_heap_size: "512m"
+case_builder_service_max_heap_size: "1g"
+case_builder_service_min_cpus: "500m"
+case_builder_service_max_cpus: 2
+
+claim_service_min_container_memory: "512Mi"
+claim_service_max_container_memory: "1Gi"
+claim_service_min_heap_size: "256m"
+claim_service_max_heap_size: "1g"
+claim_service_min_cpus: "500m"
+claim_service_max_cpus: 1
+
+configuration_service_min_container_memory: "512Mi"
+configuration_service_max_container_memory: "1Gi"
+configuration_service_min_heap_size: "256m"
+configuration_service_max_heap_size: "1g"
+configuration_service_min_cpus: "500m"
+configuration_service_max_cpus: 1
+
+dashboard_ui_min_container_memory: "64Mi"
+dashboard_ui_max_container_memory: "128Mi"
+dashboard_ui_min_cpus: "100m"
+dashboard_ui_max_cpus: 1
+
+dictionary_service_min_container_memory: "512Mi"
+dictionary_service_max_container_memory: "1Gi"
+dictionary_service_min_heap_size: "256m"
+dictionary_service_max_heap_size: "1g"
+dictionary_service_min_cpus: "500m"
+dictionary_service_max_cpus: 1
+
+documentation_service_min_container_memory: "512Mi"
+documentation_service_max_container_memory: "1Gi"
+documentation_service_min_heap_size: "256m"
+documentation_service_max_heap_size: "1g"
+documentation_service_min_cpus: "500m"
+documentation_service_max_cpus: 1
+
+event_dispatcher_service_min_container_memory: "512Mi"
+event_dispatcher_service_max_container_memory: "1Gi"
+event_dispatcher_service_min_heap_size: "256m"
+event_dispatcher_service_max_heap_size: "1g"
+event_dispatcher_service_min_cpus: "500m"
+event_dispatcher_service_max_cpus: 1
+
+importer_service_min_container_memory: "512Mi"
+importer_service_max_container_memory: "1Gi"
+importer_service_min_heap_size: "256m"
+importer_service_max_heap_size: "1g"
+importer_service_min_cpus: "500m"
+importer_service_max_cpus: 1
+
+exporter_service_min_container_memory: "512Mi"
+exporter_service_max_container_memory: "1Gi"
+exporter_service_min_heap_size: "256m"
+exporter_service_max_heap_size: "1g"
+exporter_service_min_cpus: "500m"
+exporter_service_max_cpus: 1
+
+order_service_min_container_memory: "512Mi"
+order_service_max_container_memory: "1Gi"
+order_service_min_heap_size: "256m"
+order_service_max_heap_size: "1g"
+order_service_min_cpus: "500m"
+order_service_max_cpus: 1
+
+patient_service_min_container_memory: "512Mi"
+patient_service_max_container_memory: "1Gi"
+patient_service_min_heap_size: "256m"
+patient_service_max_heap_size: "1g"
+patient_service_min_cpus: "500m"
+patient_service_max_cpus: 1
+
+user_service_min_container_memory: "500Mi"
+user_service_max_container_memory: "1Gi"
+user_service_min_heap_size: "256m"
+user_service_max_heap_size: "1g"
+user_service_min_cpus: "500m"
+user_service_max_cpus: 2
+
+process_service_min_container_memory: "1Gi"
+process_service_max_container_memory: "2Gi"
+process_service_min_heap_size: "512m"
+process_service_max_heap_size: "1g"
+process_service_min_cpus: "500m"
+process_service_max_cpus: 2
+
+mu_sagemaker_service_min_container_memory: "512Mi"
+mu_sagemaker_service_max_container_memory: "1Gi"
+mu_sagemaker_service_min_heap_size: "512m"
+mu_sagemaker_service_max_heap_size: "1g"
+mu_sagemaker_service_min_cpus: "500m"
+mu_sagemaker_service_max_cpus: 1
+
+mirth_min_container_memory: "512Mi"
+mirth_max_container_memory: "2Gi"
+mirth_min_heap_size: "512m"
+mirth_max_heap_size: "1536m"
+mirth_min_cpus: "500m"
+mirth_max_cpus: 2
+
+# Tomcat DB pool sizing for all services
+tomcat_db_connection_pool:
+  db_initial_size: 5
+  db_max_wait: 30000
+  db_max_active: 10
+  db_max_idle: 5
+  db_min_idle: 5
+
+# DB pool sizing for Process Service
+process_service_db_initial_size: 5
+process_service_db_max_wait: 30000
+process_service_db_max_active: 15
+process_service_db_max_idle: 5
+process_service_db_min_idle: 5
+
+# Although the services above could technically fit into 3 c5.2xlarges,
+# they can't once other services e.g.
+# istio, new relic are introduced
+worker_node_instance_type: c5.4xlarge
+worker_node_asg_min_size: 1
+worker_node_asg_max_size: 10
+
+###########################
+# Ingress service resources
+###########################
+ingress_mirth_min_heap_size: "12g"
+ingress_mirth_max_heap_size: "14g"
+ingress_mirth_instance_type: c5.2xlarge
+
+# Application database parameters
+application_database_instance_class: db.t3.medium
+application_database_size: 10
+application_database_version: "11.10"
+application_database_deletion_protection: false
+application_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+application_database_monitoring_interval: 30
+# No recovery of database secrets in sandbox,
+# should be higher in other environments (particulary prod)
+application_database_secret_recovery_window_days: 0
+aws_secrets_recovery_window_in_days: 0
+
+# Mirth database parameters
+mirth_database_instance_class: db.t3.small
+mirth_database_size: 10
+mirth_database_version: "11.10"
+mirth_database_deletion_protection: false
+mirth_database_enabled_cloudwatch_logs_exports:
+  - "postgresql"
+  - "upgrade"
+mirth_database_monitoring_interval: 30
+# No recovery of database secrets in sandbox,
+# should be higher in other environments (particulary prod)
+mirth_database_secret_recovery_window_days: 0
+
+ingress_mirth_database_instance_class: db.t3.small
+ingress_mirth_database_size: 10
+
+# Application data warehouse parameters
+application_data_warehouse_node_type: dc2.large
+application_data_warehouse_snapshot_retention_period: 3
+application_data_warehouse_cluster_version: 1.0
+application_data_warehouse_number_of_nodes: 1
+application_data_warehouse_logging_prefix: redshift/
+application_data_warehouse_secret_recovery_window_days: 0
+# NOTE: Below is region specific (needed for us-west-2)
+application_data_warehouse_log_bucket_policy_aws_account: "902366379725"
+
+liquibase_exporter_contexts: "schema,base,data,audit,PHS,CHS,{{ env }}"
+
+# Bastion parameters
+bastion_instance_type: t3a.micro
+
+letsencrypt_environment_server: https://acme-staging-v02.api.letsencrypt.org/directory
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+firehose_lambda_function_dir: files/firehose_lambda_function
+cloud_watch_ingest_to_elasticsearch_log_groups:
+  application_postgresql_log_group :
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-application-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-application-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "application-postgresql"
+    log_template_name: "es_postgres"
+  ingress_postgresql_log_group :
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-ingress-mirth-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-ingress-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "ingress-mirth-postgresql"
+    log_template_name: "es_postgres"
+  mirth_postgresql_log_group :
+    name: "/aws/rds/instance/codametrixapplication-{{ env }}-mirth-db/postgresql"
+    arn: "arn:aws:logs:{{ region }}:{{ aws_account_id }}:log-group:/aws/rds/instance/codametrixapplication-{{ env }}-mirth-db/postgresql"
+    kinesis_shard_count: 1
+    index_name: "mirth-postgresql"
+    log_template_name: "es_postgres"
+
+# Security Hub
+is_securityhub_account: true
+
+####################
+#  CloudWatch Alarms
+####################
+low_storage_space_cloudwatch_alarm:
+  elastic_search:
+    application_elasticsearch:
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in Megabytes,
+      # set to 64 Gigabytes (total volume size is 256 GB)
+      free_storage_space_threshold: 65536
+  rds:
+    application_db:
+      name: application
+      db_identifier: "codametrixapplication-{{ env }}-application-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes,
+      # set to 250 Gigabytes (total volume size is 1000 GB)
+      free_storage_space_threshold: 268435456000
+      unit: Bytes
+    codametrixapplication-ingress-mirth-db :
+      name: ingress-mirth
+      db_identifier: "codametrixapplication-{{ env }}-ingress-mirth-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes,
+      # set to 50 Gigabytes (total volume size is 200 GB)
+      free_storage_space_threshold: 53687091200
+      unit: Bytes
+    codametrixapplication-mirth-db :
+      name: mirth
+      db_identifier: "codametrixapplication-{{ env }}-mirth-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # The free storage space is by default in bytes,
+      # set to 50 Gigabytes (total volume size is 200 GB)
+      free_storage_space_threshold: 53687091200
+      unit: Bytes
+  redshift:
+    application_data_warehouse:
+      name: data-warehouse
+      db_identifier: "codametrixapplication-{{ env }}-data-warehouse-db"
+      statistic: Average
+      evaluation_periods: 1
+      datapoints_to_alarm: 1
+      # Percentage disk space used for data warehouse db
+      percentage_disk_space_used_threshold: 75
+
+# Kubernetes autoscaling configuration
+kubernetes_hpa:
+  default:
+    min_pods: 1
+    max_pods: 10
+  case_builder_service:
+    min_pods: 1
+    max_pods: 10
+  claim_service:
+    min_pods: 1
+    max_pods: 10
+  configuration_service:
+    min_pods: 1
+    max_pods: 10
+  dictionary_service:
+    min_pods: 1
+    max_pods: 10
+  documentation_service:
+    min_pods: 1
+    max_pods: 10
+  exporter_service:
+    min_pods: 1
+    max_pods: 10
+  importer_service:
+    min_pods: 1
+    max_pods: 10
+  order_service:
+    min_pods: 1
+    max_pods: 10
+  patient_service:
+    min_pods: 1
+    max_pods: 10
+  process_service:
+    min_pods: 1
+    max_pods: 10
+  user_service:
+    min_pods: 1
+    max_pods: 10

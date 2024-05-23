@@ -1,0 +1,93 @@
+---
+- name: Provision keypairs for bastion host, and all AWS resources
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment-secret
+        tasks_from: locals.yml
+
+    - name: Configure environment secrets
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment-secret
+        tasks_from: configure-keypair-terraform.yml
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Configure ubuntu's keypair for bastion host
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_private_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+    - name: Export baston host public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: bastion_host_keypair_public_key
+      import_role:
+        name: environment-secret
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure Dundas's keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_dundas_private_key }}"
+        aws_secret_private_key_path_var: "{{ dundas_private_key_path }}"
+      import_role:
+        name: environment-secret
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export Dundas's public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_dundas_private_key }}"
+        aws_secret_keypair_public_key: dundas_keypair_public_key
+      import_role:
+        name: environment-secret
+        tasks_from: export-publickey-to-env.yml
+
+- name: Provision environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+    - name: Configure the environment
+      environment:
+       TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+       name: environment
+       tasks_from: configure-environment.yml
+
+    - name: Configure Dundas
+      import_role:
+        name: environment
+        tasks_from: configure-dundas.yml

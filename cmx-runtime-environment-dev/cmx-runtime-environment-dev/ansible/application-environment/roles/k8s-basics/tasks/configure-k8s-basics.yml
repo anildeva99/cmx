@@ -1,0 +1,127 @@
+---
+- name: "Set CodaMetrix Namespace resource state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'codametrix-namespace.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set aws-auth ConfigMap
+    (enables IAM-RBAC mapping) state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'aws-auth-configmap.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set ECR Cred Helper resources
+    (continuously updates docker credentials
+    for cross-account ECR access) state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'ecr-cred-helper-objects.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set kubernetes ExternalSecret resources
+    (enable retrieving secrets from AWS Secrets Manager) state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'kubernetes-external-secrets.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set kubernetes kube2iam resources
+    (enable binding IAM roles to containers) state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'kube2iam-objects.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set AWS ALB Ingress Controller resources
+    (enable AWS ALB's for cluster ingress) state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'aws-alb-ingress-controller-objects.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set FluentD resources
+    (enable exporting logs to Elasticsearch) state to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: kube-system
+    resource_definition: "{{ lookup('template',
+      'fluentd-objects.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: "Set cluster autoscaler resource states to
+    {{ state }} by using {{ cluster_autoscaler_image }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template',
+      'cluster-autoscaler.yml.j2') }}"
+    state: "{{ state }}"
+
+- name: Update KubeProxy plugin
+  command: >
+    kubectl set image daemonset.apps/kube-proxy
+    --context "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    --namespace kube-system
+    "kube-proxy=602401143452.dkr.ecr.{{ region }}.amazonaws.com/eks/kube-proxy:v{{ kube_proxy_version }}-eksbuild.1"
+  changed_when: ("updated" in kube_proxy.stdout)
+  register: kube_proxy
+
+- name: Update CoreDNS plugin
+  command: >
+    kubectl set image deployment.apps/coredns
+    --context "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    --namespace kube-system
+    "coredns=602401143452.dkr.ecr.{{ region }}.amazonaws.com/eks/coredns:v{{ coredns_version }}"
+  changed_when: ("updated" in coredns.stdout)
+  register: coredns
+
+# NOTE: Per doc here:
+# https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html
+# if your current version is earlier than 1.5.0,
+# then you need to modify the config map for coredns to use the
+# forward plug-in, rather than the proxy plug-in.
+- name: Run tasks to patch CoreDNS ConfigMap
+  block:
+    - name: Create CoreDNS patch file
+      shell: >
+        kubectl get configmap coredns
+        --context "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+        -n kube-system -o yaml|sed -n '/^data:/,/^kind:/p'|
+        sed 's#proxy . /etc/resolv.conf$#forward . /etc/resolv.conf#g'
+        > /tmp/coredns_patch.yaml
+      changed_when: false
+    - name: Patch CoreDNS ConfigMap
+      k8s:
+        context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+        kind: ConfigMap
+        name: coredns
+        namespace: "kube-system"
+        src: "/tmp/coredns_patch.yaml"
+        validate:
+          fail_on_error: true
+          strict: true
+    - name: Delete CoreDNS patch file
+      file:
+        path: "/tmp/coredns_patch.yaml"
+        state: absent
+      changed_when: false
+
+- name: Update AWS CNI plugin
+  k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ cluster_name }}"
+    definition: "{{ lookup('template', 'aws-k8s-cni.yml.j2') }}"
+    state: present

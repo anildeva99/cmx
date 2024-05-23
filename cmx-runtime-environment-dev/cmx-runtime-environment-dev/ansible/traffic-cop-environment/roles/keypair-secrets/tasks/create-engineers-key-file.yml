@@ -1,0 +1,12 @@
+---
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: Create temporary key file with permissions for each engineer
+  copy:
+    content: "{{ lookup('aws_secret',
+      'CMXTrafficCop/Engineers/{{ key_catagory_var }}-{{ env }}-{{ var.name|lower }}-{{ key_suffix }}',
+      region=region) }}"
+    dest: "{{ temp_directory }}/{{ key_catagory_var }}-{{ env }}-{{ var.name|lower }}-{{ key_suffix }}"
+    mode: 0400
+  loop: "{{ engineers_var }}"
+  loop_control:
+    loop_var: var

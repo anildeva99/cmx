@@ -1,0 +1,14 @@
+---
+- name: Delete a single user
+  become: true
+  user:
+    group: nogroup
+    name: "{{ delete_user|lower }}"
+    shell: /bin/bash
+    state: absent
+
+- name: Remove user home directory
+  become: true
+  file:
+    path: "/home/{{ delete_user|lower }}"
+    state: absent

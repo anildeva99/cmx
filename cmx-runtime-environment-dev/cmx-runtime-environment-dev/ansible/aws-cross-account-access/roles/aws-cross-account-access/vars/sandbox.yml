@@ -1,0 +1,38 @@
+---
+region: us-east-2
+management_bucket: management.sandbox.codametrix.com
+env: sandbox
+
+foreign_accounts:
+  - "843902778531" # legacy sandbox
+  - "109882322034" # legacy development
+  - "441219382285" # legacy stage
+  - "075380275136" # legacy production
+  - "097524411557" # cmx onboarding
+
+# ECR repos that will be enabled for cross-account access
+ecr_repos:
+  - "mu-function-example"
+  - "mu-function-test2"
+
+# S3 Buckets that access will be given to.
+s3_buckets:
+  sagemaker.sandbox.mu.codametrix.com:
+    - bucket_object_spec: "*"
+      bucket_object_actions:
+        - s3:GetObject
+      bucket_actions:
+        - s3:ListBucket
+      foreign_account:
+        - "843902778531"
+        - "109882322034"
+        - "441219382285"
+        - "075380275136"
+        - "097524411557"
+
+kms_keys:
+  - key_alias: "alias/MuDevelopmentResources-{{ env }}-sagemaker_kms_key"
+    key_operations:
+      - Encrypt
+      - Decrypt
+      - DescribeKey

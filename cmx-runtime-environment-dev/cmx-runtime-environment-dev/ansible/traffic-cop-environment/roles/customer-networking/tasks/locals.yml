@@ -1,0 +1,6 @@
+---
+- name: Generate script to update the customer preshared keys
+  template:
+    dest: "{{ temp_directory }}/update-preshared-key-{{ env }}.sh"
+    mode: 0755
+    src: update-customer-preshared-keys.sh.j2

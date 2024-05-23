@@ -1,0 +1,6 @@
+---
+- name: Gather facts about the Redshift cluster
+  community.aws.redshift_info:
+    cluster_identifier: "{{ application_data_warehouse_identifier }}"
+    region: "{{ region }}"
+  register: redshift_cluster_facts

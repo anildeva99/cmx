@@ -1,0 +1,111 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Provision keypairs for bastion host, worker nodes, etc
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: locals.yml
+
+    - name: Configure keypair secrets
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: configure-keypair-terraform.yml
+
+    - name: Configure the customer router keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_customerrouter_private_key }}"
+        aws_secret_private_key_path_var: "{{ customerrouter_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export the customer router public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_customerrouter_private_key }}"
+        aws_secret_keypair_public_key: customerrouter_keypair_public_key
+      import_role:
+        name: keypair-secrets
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure the mirth keypair
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_mirth_ubuntu_private_key }}"
+        aws_secret_private_key_path_var: "{{ mirth_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export the mirth public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_mirth_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: mirth_keypair_public_key
+      import_role:
+        name: keypair-secrets
+        tasks_from: export-publickey-to-env.yml
+
+    - name: Configure ubuntu's keypair for bastion host
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_private_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: generate-ssh-keypair-and-store.yml
+
+    - name: Export baston host public key to env
+      vars:
+        state: present
+        aws_secret_private_key_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        aws_secret_keypair_public_key: bastion_host_keypair_public_key
+      import_role:
+        name: keypair-secrets
+        tasks_from: export-publickey-to-env.yml
+
+- name: Provision traffic cop environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+    - name: Configure the environment
+      environment:
+       TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+       name: environment
+       tasks_from: configure-environment.yml

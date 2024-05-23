@@ -1,0 +1,62 @@
+---
+developers:
+  - name: MichaelBaglio
+    email: mike@codametrix.com
+  - name: MaheshNarayanan
+    email: mahesh@codametrix.com
+  - name: JeffreyTaylor
+    email: jeffrey@codametrix.com
+  - name: PhillMellDavies
+    email: phill@codametrix.com
+    bastion_sudo: true
+  - name: JeffWoodward
+    email: woody@codametrix.com
+  - name: BrianMottershead
+    email: brian@codametrix.com
+  - name: PhilCadigan
+    email: pcadigan@codametrix.com
+  - name: QuincyEls
+    email: quincy@codametrix.com
+  - name: DebbieWalker
+    email: debbie@codametrix.com
+  - name: SrinivasPandrangi
+    email: srinivas@codametrix.com
+  - name: KeithGrohbrugge
+    email: keith@codametrix.com
+  - name: YaraBudway
+    email: yara@codametrix.com
+  - name: ShaunHines
+    email: shaun@codametrix.com
+  - name: RobCosta
+    email: rob@codametrix.com
+  - name: MikeLane
+    email: mlane@codametrix.com
+
+# Ops Users
+ops_users:
+  # Jenkins Build User
+  - userarn: arn:aws:iam::{{ codametrix_tools_account_id }}:user/CodametrixTools-tools-BuildUser
+    username: build-user
+    group: system:masters
+
+bastion_additional_users:
+  - name: KellyKeene
+    email: kelly@codametrix.com
+
+database_additional_users:
+  - KellyKeene
+
+database_superusers: []
+
+data_warehouse_additional_users:
+  - DundasBI
+
+data_warehouse_additional_rw_users:
+  - WarehouseLoader
+
+data_warehouse_additional_superusers:
+  - MikeBaglioSuperuser
+  - BrianMottersheadSuperuser
+  - SrinivasPandrangi
+
+data_lake_additional_users: []

@@ -1,0 +1,21 @@
+---
+# NOTE: Just an FYI, the 'backend_config' parameter to the terraform
+#   module only applies to the "terraform init" execution, so we really
+#   need a full backend config file, hence this template...
+- name: Generate backend.tf (terraform) from template
+  template:
+    dest: "{{ terraform_path }}/backend.tf"
+    mode: 0640
+    src: terraform-backend.tf.j2
+
+- name: Generate terraform.tfvars from template
+  template:
+    dest: "{{ terraform_path }}/terraform.tfvars"
+    mode: 0640
+    src: terraform.tfvars.j2
+
+- name: Generate dynamic_resources.tf from template
+  template:
+    dest: "{{ terraform_path }}/dynamic_resources.tf"
+    mode: 0640
+    src: dynamic-resources.tf.j2

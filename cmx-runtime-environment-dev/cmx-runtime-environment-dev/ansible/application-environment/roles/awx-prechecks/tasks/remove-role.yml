@@ -1,0 +1,6 @@
+---
+- name: Remove AWX Credentials
+  file:
+    path: "/var/lib/awx/.aws/credentials"
+    state: absent
+

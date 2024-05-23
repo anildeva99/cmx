@@ -1,0 +1,218 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: exporter-service
+  labels:
+    app: exporter-service
+spec:
+  selector:
+    app: exporter-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_exporter_service }}
+    targetPort: {{ container_ports.cmx_exporter_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exporter-service
+  labels:
+    app: exporter-service
+    version: {{ image_versions.cmx_exporter_service }}
+spec:
+  replicas: {{ (kubernetes_hpa.exporter_service.min_pods is defined) | ternary( kubernetes_hpa.exporter_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: exporter-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: exporter-service
+        version: {{ image_versions.cmx_exporter_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.exporterservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-exporter-service:{{ image_versions.cmx_exporter_service }}
+        imagePullPolicy: {{ cmx_exporter_service_image_pull_policy }}
+        name: exporter-service
+        resources:
+          limits:
+            memory: {{ exporter_service_max_container_memory }}
+            cpu: {{ exporter_service_max_cpus }}
+          requests:
+            memory: {{ exporter_service_min_container_memory }}
+            cpu: {{ exporter_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/exporter-service/exporter-service-{{ image_versions.cmx_exporter_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ exporter_service_min_heap_size }}", "-Xmx{{ exporter_service_max_heap_size }}", "/opt/tools/exporter-service/exporter-service-{{ image_versions.cmx_exporter_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_exporter_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_exporter_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_exporter_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_exporter_service_spring_profile }}
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: EXPORTER_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: exporterservice-database
+                key: dburl
+          - name: EXPORTER_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: exporterservice-database
+                key: dbusername
+          - name: EXPORTER_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: exporterservice-database
+                key: dbpassword
+          - name: EXPORTER_SERVICE_DB_INITIAL_SIZE
+            value: "{{ exporter_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: EXPORTER_SERVICE_DB_MAX_WAIT
+            value: "{{ exporter_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: EXPORTER_SERVICE_DB_MAX_ACTIVE
+            value: "{{ exporter_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: EXPORTER_SERVICE_DB_MAX_IDLE
+            value: "{{ exporter_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: EXPORTER_SERVICE_DB_MIN_IDLE
+            value: "{{ exporter_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+          - name: LIQUIBASE_EXPORTER_CONTEXTS
+            value: "{{ liquibase_exporter_contexts }}"
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: exporter-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: exporter-service
+  minReplicas: {{ (kubernetes_hpa.exporter_service.min_pods is defined) | ternary( kubernetes_hpa.exporter_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.exporter_service.max_pods is defined) | ternary( kubernetes_hpa.exporter_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

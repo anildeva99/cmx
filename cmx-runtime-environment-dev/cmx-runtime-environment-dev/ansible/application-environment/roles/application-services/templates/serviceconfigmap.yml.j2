@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-config-map
+data:
+  CMX_APPLICATION_PROFILE: "{{ env }}"
+  EVENT_DISPATCHER_SERVICE_URL: http://event-dispatcher-service.codametrix
+  USER_SERVICE_URL: http://user-service.codametrix
+  CLAIM_SERVICE_URL: http://claim-service.codametrix
+  DICTIONARY_SERVICE_URL: http://dictionary-service.codametrix
+  ORDER_SERVICE_URL: http://order-service.codametrix
+  PATIENT_SERVICE_URL: http://patient-service.codametrix
+  CASE_BUILDER_SERVICE_URL: http://case-builder-service.codametrix
+  IMPORTER_SERVICE_URL: http://importer-service.codametrix
+  CONFIGURATION_SERVICE_URL: http://configuration-service.codametrix
+  DOCUMENT_SERVICE_URL: http://documentation-service.codametrix
+  PROCESS_SERVICE_URL: http://process-service.codametrix
+  MU_SAGEMAKER_SERVICE_URL: http://mu-sagemaker-service.codametrix
+  EXPORTER_SERVICE_URL: http://exporter-service.codametrix
+  MONITOR_SERVICE_URL: http://monitor-service.codametrix

@@ -1,0 +1,51 @@
+---
+  # NOTE: Collect information we will need
+  #   for the environment configmap
+  # TODO: [DEVOPS-397] Switch to using --query flag
+  #   instead of a pipe to jq for aws-cli commands
+- name: Get the MSK cluster ARN
+  shell: >
+    aws kafka list-clusters --region "{{ region }}"
+    --cluster-name-filter "CMXApp-{{ env }}-application-data-warehouse-msk-cluster"|
+    jq '.ClusterInfoList[0].ClusterArn'
+  register: msk_cluster_arn
+
+  # TODO: [DEVOPS-397] Switch to using --query flag
+  #   instead of a pipe to jq for aws-cli commands
+- name: Get the list of bootstrap brokers for the MSK cluster
+  shell: >
+    aws kafka get-bootstrap-brokers --region "{{ region }}"
+    --cluster-arn "{{ msk_cluster_arn.stdout }}"|
+    jq -r '.BootstrapBrokerStringTls'
+  register: msk_cluster_bootstrap_brokers
+
+  # TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Get the KMS key ID for Sagemaker to use
+    for encrypting ephemeral volumes"
+  community.aws.aws_kms_info:
+    filters:
+      alias: "CodaMetrixApplication-{{ env }}-mu_sagemaker_ephemeral_storage_key"
+    region: "{{ region }}"
+  register: mu_sagemaker_volume_key_info
+
+# TODO: [DEVOPS-397] Switch to using --query flag
+#   instead of a pipe to jq for aws-cli commands
+- name: "Get the KMS key ID for the ML notebook to
+    use for reading/writing in it's S3 assets bucket."
+  shell: >
+    aws kms describe-key --region "{{ region }}"
+    --key-id "{{ process_data_bucket_key_alias }}"|
+    jq -r '.KeyMetadata.Arn'
+  register: mu_sagemaker_data_key
+
+# NOTE: Apply environment ConfigMap (environmentconfigmap.yml.j2)
+#   to enable environment-variable mapping of
+#   various environment-specific values
+# TODO: [DEVOPS-386] shorten varibles definitions to be less than 80 char
+- name: "Set environment ConfigMap resource states to {{ state }}"
+  community.kubernetes.k8s:
+    context: "arn:aws:eks:{{ region }}:{{ aws_account_id }}:cluster/{{ eks_cluster_name }}"
+    namespace: codametrix
+    resource_definition: "{{ lookup('template',
+      'environmentconfigmap.yml.j2') }}"
+    state: "{{ state }}"

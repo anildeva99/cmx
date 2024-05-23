@@ -1,0 +1,369 @@
+####################
+# Environment basics
+####################
+aws_region                   = "{{ region }}"
+environment                  = "{{ env }}"
+sso_login_account_id         = "{{ sso_login_account_id }}"
+
+peer_vpc_routes = {
+  {% for route in peer_vpc_routes %}
+    "{{ route.pcx_name }}" = {
+      "pcx_name" = "{{ route.pcx_name }}",
+      "destination_cidr" = "{{ route.destination_cidr }}"
+    },
+  {% endfor %}
+}
+
+shared_resource_tags = {
+  {% for key, value in shared_resource_tags.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+environment_dns_name              = "{{ environment_dns_name }}"
+
+database_temporary_password       = "{{ database_temporary_password }}"
+
+iam_resource_path                 = "/"
+
+logs_bucket                       = "{{ logs_bucket }}"
+
+###########
+# VPC Stuff
+###########
+vpc_cidr_block               = "{{ ip_range_prefix }}.0.0/16"
+vpc_subnet_cidr_block_prefix = "{{ ip_range_prefix }}"
+vpc_subnet_cidr_block_suffix = "0/24"
+
+customerrouter_amis = {
+  {% for key, value in customerrouter_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+customerrouter_instance_type  = "{{ customerrouter_instance_type }}"
+customerrouter_key_name       = "{{ customerrouter_key_name }}"
+customerrouter_public_key     = "{{ customerrouter_keypair_public_key }}"
+
+##############
+# Bastion host
+##############
+bastion_instance_type        = "{{ bastion_instance_type }}"
+bastion_host_key_name        = "{{ bastion_host_key_name }}"
+bastion_host_public_key      = "{{ bastion_host_keypair_public_key }}"
+bastion_amis = {
+  {% for key, value in bastion_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+bastion_ingress_from_cidr_sgs = [
+  {% for bastion_ingress_from_cidr in bastion_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ bastion_ingress_from_cidr.description }}"
+      "from_port" = "{{ bastion_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ bastion_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ bastion_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in bastion_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+bastion_ingress_from_sg_sgs = [
+  {% for bastion_ingress_from_sg in bastion_ingress_from_sg_sgs %}
+    {
+      {% for key, value in bastion_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+
+secrets_kms_key_alias = "{{ secrets_kms_key_alias }}"
+
+aws_secret_manager_secret_key_initial_value = "{{ aws_secret_manager_secret_key_initial_value }}"
+aws_secrets_recovery_window_in_days         = {{ aws_secrets_recovery_window_in_days }}
+
+###########################
+# SNS Topics and SQS Queues
+###########################
+sns_topics = {
+  {% for key, value in sns_topics.items() %}
+    "{{key }}" = {
+      {% for key1, value1 in value.items() %}
+         "{{ key1 }}" = "{{ value1 }}",
+      {% endfor %}
+    }
+  {% endfor %}
+}
+
+#################
+# Engineer stuff
+#################
+engineers  = [
+  {% for engineer in engineers %}
+  {
+    "name" = "{{ engineer.name }}",
+    "email" = "{{ engineer.email }}"
+  },
+  {% endfor %}
+]
+
+#############
+# Mirth Stuff
+#############
+mirth_role_name                             = "{{ mirth_role_name }}"
+mirth_database_multi_az                     = {{ mirth_database_multi_az|lower }}
+mirth_database_identifier                   = "{{ mirth_database_identifier }}"
+mirth_database_name                         = "{{ mirth_database_name }}"
+mirth_database_admin_username               = "{{ mirth_database_admin_username }}"
+mirth_database_allocated_storage_gb         = "{{ mirth_database_allocated_storage_gb }}"
+mirth_database_max_allocated_storage_gb     = "{{ mirth_database_max_allocated_storage_gb }}"
+mirth_database_version                      = "{{ mirth_database_version }}"
+mirth_database_instance_class               = "{{ mirth_database_instance_class }}"
+mirth_database_backup_retention_period      = "{{ mirth_database_backup_retention_period }}"
+mirth_database_deletion_protection          = "{{ mirth_database_deletion_protection|lower }}"
+mirth_database_enabled_cloudwatch_logs_exports = [
+  {% for export in mirth_database_enabled_cloudwatch_logs_exports %}
+  "{{ export }}",
+  {% endfor %}
+]
+mirth_database_monitoring_interval          = "{{ mirth_database_monitoring_interval }}"
+mirth_database_subnet_group_name            = "{{ mirth_database_subnet_group_name }}"
+mirth_database_secret_recovery_window_days  = "{{ mirth_database_secret_recovery_window_days }}"
+mirth_database_username                     = "{{ mirth_database_username }}"
+mirth_database_secrets_usage_policy_name    = "{{ mirth_database_secrets_usage_policy_name }}"
+mirth_database_kms_key_alias                = "{{ mirth_database_kms_key_alias }}"
+mirth_database_parameter_group              = "{{ mirth_database_parameter_group }}"
+mirth_database_secret_name                  = "{{ mirth_database_secret_name }}"
+mirth_database_admin_secret_name            = "{{ mirth_database_admin_secret_name }}"
+mirth_database_security_group_name          = "{{ mirth_database_security_group_name }}"
+mirth_rds_enhanced_monitoring_role_name     = "{{ mirth_rds_enhanced_monitoring_role_name }}"
+mirthconnect_dns_address                    = "{{ mirthconnect_dns_address }}"
+
+mirth_amis = {
+  {% for key, value in mirth_amis.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+mirth_key_name            = "{{ mirth_key_name }}"
+mirth_public_key          = "{{ mirth_keypair_public_key }}"
+mirth_instance_type       = "{{ mirth_instance_type }}"
+
+#######################
+# Elasticsearch Service
+#######################
+elasticsearch_domain                    = "{{ elasticsearch_domain }}"
+elasticsearch_version                   = "{{ elasticsearch_version }}"
+elasticsearch_ebs_volume_size           = "{{ elasticsearch_ebs_volume_size }}"
+elasticsearch_instance_type             = "{{ elasticsearch_instance_type }}"
+elasticsearch_instance_count            = {{ elasticsearch_instance_count }}
+elasticsearch_dedicated_master_enabled  = {{ elasticsearch_dedicated_master_enabled|lower }}
+elasticsearch_dedicated_master_count    = {{ elasticsearch_dedicated_master_count }}
+elasticsearch_zone_awareness_enabled    = {{ elasticsearch_zone_awareness_enabled|lower }}
+
+########################
+# Security Tool Related
+########################
+vpc_flow_log_group_name            = "{{ vpc_flow_log_group_name }}"
+vpc_flow_log_traffic_type          = "{{ vpc_flow_log_traffic_type }}"
+aws_inspector_enabled              = "{{ aws_inspector_enabled }}"
+inspector_schedule_expression      = "{{ inspector_schedule_expression }}"
+inspector_assessment_duration      = "{{ inspector_assessment_duration }}"
+ruleset_cve                        = "{{ ruleset_cve|lower }}"
+ruleset_cis                        = "{{ ruleset_cis|lower }}"
+ruleset_security_best_practices    = "{{ ruleset_security_best_practices|lower }}"
+ruleset_network_reachability       = "{{ ruleset_network_reachability|lower }}"
+inspector_enable_scheduled_event   = "{{ inspector_enable_scheduled_event|lower }}"
+aws_inspector_ruleset_region       = "{{ aws_inspector_ruleset_region }}"
+aws_ruleset_account_id             = "{{ aws_ruleset_account_id }}"
+aws_ruleset_cve_id                 = "{{ aws_ruleset_cve_id }}"
+aws_ruleset_cis_id                 = "{{ aws_ruleset_cis_id }}"
+ruleset_security_best_practices_id = "{{ ruleset_security_best_practices_id }}"
+ruleset_network_reachability_id    = "{{ ruleset_network_reachability_id }}"
+guardduty_detector_enable          = "{{ guardduty_detector_enable|lower }}"
+guardduty_master_account_id        = "{{ guardduty_master_account_id }}"
+
+aws_foundations_securityhub_standards_subscription_arn = "{{ aws_foundations_securityhub_standards_subscription_arn }}"
+aws_securityhub_product_subscription_arn               = "{{ aws_securityhub_product_subscription_arn }}"
+
+##########################
+# Customer Specific stuff!
+##########################
+partners_vpn_secret_recovery_window_days = "{{ partners_vpn_secret_recovery_window_days }}"
+partners_ingress_open_ports = [
+  {% for partners_ingress_open_port in partners_ingress_open_ports %}
+  "{{ partners_ingress_open_port }}",
+  {% endfor %}
+]
+
+cumedicine_vpn_secret_recovery_window_days = "{{ cumedicine_vpn_secret_recovery_window_days }}"
+cumedicine_ingress_open_ports = [
+  {% for cumedicine_ingress_open_port in cumedicine_ingress_open_ports %}
+  "{{ cumedicine_ingress_open_port }}",
+  {% endfor %}
+]
+
+yale_vpn_secret_recovery_window_days = "{{ yale_vpn_secret_recovery_window_days }}"
+yale_ingress_open_ports = [
+  {% for yale_ingress_open_port in yale_ingress_open_ports %}
+  "{{ yale_ingress_open_port }}",
+  {% endfor %}
+]
+
+############################################################
+#  CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+############################################################
+cloud_watch_ingest_to_elasticsearch_log_groups  = {
+  {% for key, value in cloud_watch_ingest_to_elasticsearch_log_groups.items() %}
+    "{{ key }}" = {
+      {% for key1, value1 in value.items() %}
+       "{{ key1 }}" = "{{ value1 }}"
+       {% endfor %}
+     }
+  {% endfor %}
+}
+
+firehose_lambda_function_dir = "{{ firehose_lambda_function_dir }}"
+log_subscription_filter_distribution = "{{ log_subscription_filter_distribution }}"
+kinesis_rentention_period = "{{ kinesis_rentention_period }}"
+kinesis_stream_kms_key_alias = "{{ kinesis_stream_kms_key_alias }}"
+
+firehose_lambda_runtime_type = "{{ firehose_lambda_runtime_type }}"
+firehose_cloudwatch_log_retention = "{{ firehose_cloudwatch_log_retention }}"
+firehose_lambda_function_timeout = "{{ firehose_lambda_function_timeout }}"
+firehose_elasticsearch_configuration_buffering_interval = "{{ firehose_elasticsearch_configuration_buffering_interval }}"
+firehose_elasticsearch_configuration_buffering_size = "{{ firehose_elasticsearch_configuration_buffering_size }}"
+firehose_s3_backup_bucket_configuration_buffering_interval = "{{ firehose_s3_backup_bucket_configuration_buffering_interval }}"
+firehose_s3_backup_bucket_configuration_buffering_size = "{{ firehose_s3_backup_bucket_configuration_buffering_size }}"
+firehose_s3_backup_bucket_configuration_prefix = "{{ firehose_s3_backup_bucket_configuration_prefix }}"
+firehose_s3_config_cloudwatch_logging_options_enabled = "{{ firehose_s3_config_cloudwatch_logging_options_enabled|lower }}"
+firehose_s3_config_cloudwatch_logging_options_log_group_name= "{{ firehose_s3_config_cloudwatch_logging_options_log_group_name }}"
+firehose_s3_config_cloudwatch_logging_options_log_stream_name = "{{ firehose_s3_config_cloudwatch_logging_options_log_stream_name }}"
+firehose_elasticsearch_configuration_index_rotation_period = "{{ firehose_elasticsearch_configuration_index_rotation_period }}"
+firehose_elasticsearch_configuration_s3_backup_mode = "{{ firehose_elasticsearch_configuration_s3_backup_mode }}"
+firehose_record_lambda_func_processing_configuration_enabled = "{{ firehose_record_lambda_func_processing_configuration_enabled|lower }}"
+firehose_record_processors_type = "{{ firehose_record_processors_type }}"
+firehose_processor_parameter_name = "{{ firehose_processor_parameter_name }}"
+###################################################################
+#  End of CloudWatch-> Kinesis/Firehose-> Elastic Search Pipeline
+###################################################################
+
+###################################################################
+#  CloudWatch Alarm -> SNS Topic -> User Email
+###################################################################
+free_storage_metrix_name = "{{ free_storage_metrix_name }}"
+percentage_disk_space_used_metrix_name = "{{percentage_disk_space_used_metrix_name }}"
+less_than_or_equal_to_comparison_operator = "{{ less_than_or_equal_to_comparison_operator }}"
+greater_than_comparison_operator = "{{ greater_than_comparison_operator }}"
+statistic_period = "{{ statistic_period }}"
+
+treat_missing_data   = {
+  {% for key, value in treat_missing_data.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+cloudwatch_alarm_namespace  = {
+  {% for key, value in cloudwatch_alarm_namespace.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+low_storage_space_cloudwatch_alarm  = {
+  {% for key, value in low_storage_space_cloudwatch_alarm.items() %}
+  "{{ key }}" = {
+      {% if value is mapping %}
+        {% for key1, value1 in value.items() %}
+          "{{ key1 }}" = {
+             {% for key2, value2 in value1.items() %}
+               "{{ key2 }}" = "{{ value2 }}"
+             {% endfor %}
+          }
+        {% endfor %}
+      {% endif %}
+   }
+  {% endfor %}
+}
+
+mirth_alarms_enabled = {{ mirth_alarms_enabled|lower }}
+mirth_liveness_threshold = {{ mirth_liveness_threshold }}
+mirth_network_throughput_threshold = {{ mirth_network_throughput_threshold }}
+customerrouter_liveness_threshold = {{ customerrouter_liveness_threshold }}
+customerrouter_network_throughput_threshold = {{ customerrouter_network_throughput_threshold }}
+
+###################################################################
+#  End of CloudWatch Alarm -> SNS Topic -> User Email
+###################################################################
+
+###################################################################
+#  Enable KMS key rotation
+###################################################################
+enable_key_rotation = "{{ enable_key_rotation|lower }}"
+
+###########
+# New Relic
+###########
+new_relic_temporary_license_key = "{{ new_relic_temporary_license_key }}"
+
+###################################################################
+#  Enable additional traffic ports to ingress mirth
+###################################################################
+mirth_additional_open_ports = [
+  {% for mirth_additional_open_port in mirth_additional_open_ports %}
+  "{{ mirth_additional_open_port }}",
+  {% endfor %}
+]
+
+#######################
+# Mirth Connect Ingress
+#######################
+mirth_connect_api_ingress_from_cidr_sgs = [
+  {% for mirth_connect_api_ingress_from_cidr in mirth_connect_api_ingress_from_cidr_sgs %}
+    {
+      "description" = "{{ mirth_connect_api_ingress_from_cidr.description }}"
+      "from_port" = "{{ mirth_connect_api_ingress_from_cidr.from_port }}"
+      "to_port" = "{{ mirth_connect_api_ingress_from_cidr.to_port }}"
+      "protocol" = "{{ mirth_connect_api_ingress_from_cidr.protocol }}"
+      "cidr_blocks" = [
+        {% for item in mirth_connect_api_ingress_from_cidr.cidr_blocks %}
+        "{{ item }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]
+
+mirth_connect_api_ingress_from_sg_sgs = [
+  {% for mirth_connect_api_ingress_from_sg in mirth_connect_api_ingress_from_sg_sgs %}
+    {
+      {% for key, value in mirth_connect_api_ingress_from_sg.items() %}
+        "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    },
+  {% endfor %}
+]
+
+# Backing up indices of elasticsearch to s3 bucket
+elasticsearch_index_rotation   = {
+  {% for key, value in elasticsearch_index_rotation.items() %}
+    "{{ key }}" = {
+      {% for key1, value1 in value.items() %}
+        {% if key1 == "indices" %}
+           "{{ key1 }}" = "[ {% for item in value1 %}  {  {% for key2, value2 in item.items() %}  '{{ key2 }}' : '{{ value2 }}',   {% endfor %}     },   {% endfor %}]"
+        {% else %}
+          "{{ key1 }}" = "{{ value1 }}",
+        {% endif %}
+      {% endfor %}
+    }
+  {% endfor %}
+}
+
+elasticsearch_index_rotation_lambda  = {
+  {% for key, value in elasticsearch_index_rotation_lambda.items() %}
+    "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}

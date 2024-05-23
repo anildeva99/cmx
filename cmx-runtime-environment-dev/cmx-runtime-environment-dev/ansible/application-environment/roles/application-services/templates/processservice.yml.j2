@@ -1,0 +1,279 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: process-service
+  labels:
+    app: process-service
+spec:
+  selector:
+    app: process-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.cmx_process_service }}
+    targetPort: {{ container_ports.cmx_process_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: process-service
+  labels:
+    app: process-service
+    version: {{ image_versions.cmx_process_service }}
+spec:
+  replicas: {{ (kubernetes_hpa.process_service.min_pods is defined) | ternary( kubernetes_hpa.process_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  selector:
+    matchLabels:
+      app: process-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: process-service
+        version: {{ image_versions.cmx_process_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.processservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/cmx-process-service:{{ image_versions.cmx_process_service }}
+        imagePullPolicy: {{ cmx_process_service_image_pull_policy }}
+        name: process-service
+        resources:
+          limits:
+            memory: {{ process_service_max_container_memory }}
+            cpu: {{ process_service_max_cpus }}
+          requests:
+            memory: {{ process_service_min_container_memory }}
+            cpu: {{ process_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000", "-jar", "/opt/tools/cmx-process-service/cmx-process-service-{{ image_versions.cmx_process_service }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-javaagent:/opt/util/newrelic/newrelic.jar", "-Dnewrelic.environment={{ env }}", "-jar", "-Xms{{ process_service_min_heap_size }}", "-Xmx{{ process_service_max_heap_size }}", "/opt/tools/cmx-process-service/cmx-process-service-{{ image_versions.cmx_process_service }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.cmx_process_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_process_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.cmx_process_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: {{ cmx_process_service_spring_profile }}
+          - name: CASE_JSON_AWS_S3_BUCKET
+            value: {{ process_data_bucket }}
+          - name: CASE_JSON_AWS_S3_BUCKET_ROOT_PATH
+            value: {{ process_data_bucket_root }}
+          - name: OAUTH2_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: oauth-process
+                key: oauthid
+          - name: OAUTH2_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: oauth-process
+                key: oauthsecret
+          - name: REDIS_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisaddress
+          - name: REDIS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redisport
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: security-redis
+                key: redispassword
+          - name: PROCESS_SERVICE_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: processservice-database
+                key: dburl
+          - name: PROCESS_SERVICE_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: processservice-database
+                key: dbusername
+          - name: PROCESS_SERVICE_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: processservice-database
+                key: dbpassword
+          - name: PROCESS_SERVICE_DB_INITIAL_SIZE
+            value: "{{ process_service_db_initial_size|default(tomcat_db_connection_pool.db_initial_size) }}"
+          - name: PROCESS_SERVICE_DB_MAX_WAIT
+            value: "{{ process_service_db_max_wait|default(tomcat_db_connection_pool.db_max_wait) }}"
+          - name: PROCESS_SERVICE_DB_MAX_ACTIVE
+            value: "{{ process_service_db_max_active|default(tomcat_db_connection_pool.db_max_active) }}"
+          - name: PROCESS_SERVICE_DB_MAX_IDLE
+            value: "{{ process_service_db_max_idle|default(tomcat_db_connection_pool.db_max_idle) }}"
+          - name: PROCESS_SERVICE_DB_MIN_IDLE
+            value: "{{ process_service_db_min_idle|default(tomcat_db_connection_pool.db_min_idle) }}"
+          - name: JWT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security
+                key: jwt_key
+          - name: AWS_DEFAULT_REGION
+            value: "{{ region }}"
+          - name: AWS_SNS_ENDPOINT
+            value: "https://sns.{{ region }}.amazonaws.com"
+          - name: AWS_SNS_TOPIC
+            value: "{{ sns_topics.event_topic.name }}"
+          - name: MU_ECR_BASE_URL
+            value: "{{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com"
+          - name: MU_ROLE_ARN
+            value: "arn:aws:iam::{{ aws_account_id }}:role/{{ mu_default_task_execution_role }}"
+          - name: MU_MAPPING_ENVIRONMENT
+            value: "{{ mu_mapping_environment }}"
+          - name: MU_PREDICTION_S3_TASK_ASSETS
+            value: "{{ process_data_bucket }}"
+          - name: MU_MOCK_LEVEL
+            value: "{{ mu_sagemaker_settings.mu_mock_level }}"
+          - name: MU_BATCH_MIN_SIZE
+            value: "{{ mu_sagemaker_settings.mu_batch_min_size }}"
+          - name: MU_BATCH_MAX_AGE_MINUTES
+            value: "{{ mu_sagemaker_settings.mu_batch_max_age_minutes }}"
+          - name: MU_PREDICTION_FUNCTION
+            value: "{{ mu_sagemaker_settings.mu_prediction_function }}"
+          - name: MU_PREDICTION_VERSION
+            value: "{{ mu_sagemaker_settings.mu_prediction_version }}"
+          - name: MU_ALGORITHM
+            value: "{{ mu_sagemaker_settings.mu_algorithm }}"
+          - name: MU_ENVIRONMENT
+            value: "{{ env }}"
+          - name: MU_PROVENANCE
+            value: "{{ mu_sagemaker_settings.mu_provenance }}"
+          - name: SAGEMAKER_DATA_BUCKET_NAME
+            value: "{{ mu_job_data_bucket }}"
+          - name: ACTIVITY_EVIDENCE_ENABLED
+            value: "{{ process_service_activity_evidence_enabled }}"
+          - name: DECISION_EVIDENCE_ENABLED
+            value: "{{ process_service_decision_evidence_enabled }}"
+          # All camunda values are set to 50% of db_max_active
+          # or limited to camunda_max_pool_size_possible if 50% of
+          # db_max_active > camunda_max_pool_size_possible
+          - name: CAMUNDA_JOB_EXECUTION_CORE_POOL_SIZE
+            value: "{{ [(process_service_db_max_active|
+                        default(tomcat_db_connection_pool.db_max_active)|
+                        int * 0.5)|int, camunda_max_pool_size_possible]|min }}"
+          - name: CAMUNDA_JOB_EXECUTION_MAX_POOL_SIZE
+            value: "{{ [(process_service_db_max_active|
+                        default(tomcat_db_connection_pool.db_max_active)|
+                        int * 0.5)|int, camunda_max_pool_size_possible]|min }}"
+          - name: CAMUNDA_JOB_EXECUTION_MAX_JOBS_PER_ACQUISITION
+            value: "{{ [(process_service_db_max_active|
+                        default(tomcat_db_connection_pool.db_max_active)|
+                        int * 0.5)|int, camunda_max_pool_size_possible]|min }}"
+          - name: CAMUNDA_JOB_EXECUTION_QUEUE_CAPACITY
+            value: "{{ [(process_service_db_max_active|
+                        default(tomcat_db_connection_pool.db_max_active)|
+                        int * 0.5)|int, camunda_max_pool_size_possible]|min }}"
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: process-service
+  namespace: codametrix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: process-service
+  minReplicas: {{ (kubernetes_hpa.process_service.min_pods is defined) | ternary( kubernetes_hpa.process_service.min_pods, kubernetes_hpa.default.min_pods) }}
+  maxReplicas: {{ (kubernetes_hpa.process_service.max_pods is defined) | ternary( kubernetes_hpa.process_service.max_pods, kubernetes_hpa.default.max_pods) }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ hpa_cpu_resource_average_utilization }}

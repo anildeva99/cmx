@@ -1,0 +1,29 @@
+---
+# Environment variables retrieved from the cloud environment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-config-map
+data:
+  CODAMETRIX_URL: "https://{{ cmx_automate_dns_name }}"
+  DATALAKE_KAFKA_BOOTSTRAP_SERVERS: "{{ msk_cluster_bootstrap_brokers.stdout }}"
+  DATALAKE_KAFKA_CASE_EVENTS_TOPIC: "{{ kafka_case_event_topic }}"
+  DATALAKE_KAFKA_DATA_CHANGE_EVENTS_TOPIC: "{{ kafka_data_change_event_topic }}"
+  DATALAKE_KAFKA_HIPAA_EVENTS_TOPIC: "{{ kafka_hipaa_event_topic }}"
+  DATALAKE_KAFKA_TRUSTSTORE: "/etc/ssl/certs/java/cacerts"
+
+  # These two keys are meant for to be used as the volume encryption key for Sagemaker
+  SAGEMAKER_DEFAULT_KMS_KEY_ID: "{{ mu_sagemaker_volume_key_info['keys'][0].key_id }}"
+  MU_KMS_KEY_ID: "{{ mu_sagemaker_volume_key_info['keys'][0].key_id }}"
+
+  # This key is used for Sagemaker to encrypt/decrypt data that it stores in S3
+  MU_PREDICTION_S3_KMS_KEY_ID: "{{ mu_sagemaker_data_key.stdout_lines[0] }}"
+
+  # Dundas
+  DUNDAS_SERVER_URL: "{{dundas_server_url}}"
+  DUNDAS_DASHBOARD_URL: "{{dundas_dashboard_url}}"
+  DUNDAS_FILESYSTEM_ID: "{{dundas_filesystem_id}}"
+  DUNDAS_ENABLED: "{{dundas_enabled}}"
+
+  # Dictionary
+  DICTIONARY_ENABLED: "{{dictionary_ui_enabled}}"

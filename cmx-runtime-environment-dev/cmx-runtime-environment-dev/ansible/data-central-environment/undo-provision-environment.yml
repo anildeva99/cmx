@@ -1,0 +1,39 @@
+---
+- name: Unprovision keypairs and environment
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: absent
+  tasks:
+    - name: Import environment-common role
+      import_role:
+        name: environment-common
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment-secret
+        tasks_from: locals.yml
+
+    - name: Configure environment secrets
+      environment:
+        TF_DATA_DIR: "{{ keypair_terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment-secret
+        tasks_from: configure-keypair-terraform.yml
+
+    - name: Create local files needed for running Terraform
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: locals.yml
+
+    - name: Configure the environment
+      environment:
+        TF_DATA_DIR: "{{ terraform_path }}/.terraform-{{ env }}"
+      import_role:
+        name: environment
+        tasks_from: configure-environment.yml

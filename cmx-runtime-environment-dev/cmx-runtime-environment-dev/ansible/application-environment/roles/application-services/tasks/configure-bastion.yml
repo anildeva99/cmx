@@ -1,0 +1,29 @@
+---
+- name: Copy the cluster bastion private key to the bastion host
+  become: true
+  copy:
+    content: "{{ lookup('aws_secret',
+      '{{ aws_secret_cluster_bastion_host_private_key }}',
+      region=region) }}"
+    dest: /home/bastion/.ssh/cluster_bastion_id_rsa
+    group: nogroup
+    mode: 0600
+    owner: bastion
+  when: (enable_cluster_bastion)
+
+- name: Copy the developers cluster bastion private keys to the bastion host
+  become: true
+  vars:
+    secret: "cluster-bastion-{{ env }}-{{ dev_key.name|lower }}-id_ssh_rsa"
+  copy:
+    content: "{{ lookup('aws_secret',
+      'CodaMetrixApplication/Developers/{{ secret }}',
+      region=region) }}"
+    dest: "/home/{{ dev_key.name|lower }}/.ssh/cluster_bastion_id_rsa"
+    group: nogroup
+    mode: 0600
+    owner: "{{ dev_key.name|lower }}"
+  loop: "{{ developers }}"
+  loop_control:
+    loop_var: dev_key
+  when: (enable_cluster_bastion)

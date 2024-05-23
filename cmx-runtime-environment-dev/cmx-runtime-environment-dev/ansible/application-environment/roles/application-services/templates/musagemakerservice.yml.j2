@@ -1,0 +1,169 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: mu-sagemaker-service
+  labels:
+    app: mu-sagemaker-service
+spec:
+  selector:
+    app: mu-sagemaker-service
+  ports:
+  - protocol: TCP
+    name: tcp
+    port: {{ service_ports.mu_sagemaker_service }}
+    targetPort: {{ container_ports.mu_sagemaker_service }}
+
+{% if enable_java_debugger %}
+  - protocol: TCP
+    name: tcp
+    port: 8000
+    targetPort: 8000
+{% endif %}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mu-sagemaker-service
+  labels:
+    app: mu-sagemaker-service
+    version: {{ image_versions.mu_sagemaker_service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mu-sagemaker-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 50%
+  template:
+    metadata:
+      labels:
+        app: mu-sagemaker-service
+        version: {{ image_versions.mu_sagemaker_service }}
+      annotations:
+        iam.amazonaws.com/role: {{ service_roles.musagemakerservice }}
+    spec:
+      volumes:
+      - name: newrelic-javaagent-configuration-map-volume
+        configMap:
+          name: newrelic-javaagent-configuration-map
+
+      containers:
+      - image: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com/mu-sagemaker:{{ image_versions.mu_sagemaker_service }}
+        imagePullPolicy: {{ mu_sagemaker_service_image_pull_policy }}
+        name: mu-sagemaker-service
+        resources:
+          limits:
+            memory: {{ mu_sagemaker_service_max_container_memory }}
+            cpu: {{ mu_sagemaker_service_max_cpus }}
+          requests:
+            memory: {{ mu_sagemaker_service_min_container_memory }}
+            cpu: {{ mu_sagemaker_service_min_cpus }}
+
+        volumeMounts:
+          - name: newrelic-javaagent-configuration-map-volume
+            mountPath: /opt/util/newrelic/newrelic.yml
+            subPath: newrelic.yml
+            readOnly: false
+
+{% if enable_java_debugger %}
+        command: ["java"]
+        args: ["-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8000 -jar /opt/tools/mu-sagemaker-service/mu-sagemaker-service-{{ image_versions.mu_sagemaker_service  }}.jar"]
+{% elif enable_idle_mode %}
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{% else %}
+        command: ["java"]
+        args: ["-jar", "-Xms{{ mu_sagemaker_service_min_heap_size }}", "-Xmx{{ mu_sagemaker_service_max_heap_size }}", "/opt/mu-sagemaker/mu-sagemaker-{{ image_versions.mu_sagemaker_service  }}.jar"]
+{% endif %}
+
+        ports:
+          - containerPort: {{ container_ports.mu_sagemaker_service }}
+            name: http
+            protocol: TCP
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.mu_sagemaker_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health
+            port: {{ container_ports.mu_sagemaker_service }}
+            scheme: "HTTP"
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+
+        envFrom:
+          - configMapRef:
+              name: service-config-map
+          - configMapRef:
+              name: environment-config-map
+
+        env:
+          - name: SAGEMAKER_DB_DRIVER
+            value: org.postgresql.Driver
+          - name: SAGEMAKER_DB_URL
+            valueFrom:
+              secretKeyRef:
+                name: musagemakerservice-database
+                key: dburl
+          - name: SAGEMAKER_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: musagemakerservice-database
+                key: dbusername
+          - name: SAGEMAKER_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: musagemakerservice-database
+                key: dbpassword
+          - name: SAGEMAKER_MANIFEST_BUCKET_NAME
+            value: "{{ mu_job_manifest_bucket }}"
+          - name: SAGEMAKER_DATA_BUCKET_NAME
+            value: "{{ mu_job_data_bucket }}"
+          - name: SAGEMAKER_DEFAULT_ECR_URL
+            value: {{ codametrix_tools_account_id }}.dkr.ecr.{{ region }}.amazonaws.com
+          - name: SAGEMAKER_DEFAULT_TASK_EXECUTION_ROLE_ARN
+            value: arn:aws:iam::{{ aws_account_id }}:role/{{ mu_default_task_execution_role }}
+          - name: SAGEMAKER_CAMUNDA_REST_URL
+            value: http://process-service.codametrix/{{ process_service_endpoint_path }}
+          - name: NEW_RELIC_LICENSE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: security-new-relic
+                key: license_key
+          - name: NEW_RELIC_AGENT_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: agent_enabled
+          - name: NEW_RELIC_APP_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: app_name
+          - name: NEW_RELIC_HIGH_SECURITY
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: high_security
+          - name: NEW_RELIC_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: newrelic-javaagent-configuration-map
+                key: log_level

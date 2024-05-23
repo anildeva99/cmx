@@ -1,0 +1,13 @@
+# Peering connections for the sandbox environment
+
+application_peer_vpc_routes:
+  - pcx_name: CMXSandboxApp-CMXSandboxIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.62.0.0/16
+  - pcx_name: ToolsNet-CMXSandbox # Tools Network <-> Sandbox
+    destination_cidr: "{{ codametrix_tools_cidr }}"
+
+ingress_peer_vpc_routes:
+  - pcx_name: CMXSandboxApp-CMXSandboxIngress # Application Mirth <-> Ingress Mirth
+    destination_cidr: 10.61.0.0/16
+  - pcx_name: ToolsNet-CMXSandboxIngress # Tools Network <-> Sandbox Ingress
+    destination_cidr: "{{ codametrix_tools_cidr }}"

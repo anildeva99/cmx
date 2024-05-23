@@ -1,0 +1,27 @@
+####################
+# Environment basics
+####################
+aws_region  = "{{ region }}"
+environment = "{{ env }}"
+
+aws_secret_manager_secret_key_initial_value = "{{ aws_secret_manager_secret_key_initial_value }}"
+aws_secrets_recovery_window_in_days = {{ aws_secrets_recovery_window_in_days }}
+
+shared_resource_tags = {
+  {% for key, value in shared_resource_tags.items() %}
+  "{{ key }}" = "{{ value }}",
+  {% endfor %}
+}
+
+aws_secret_bastion_host_ubuntu_private_key = "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+aws_secret_customer_networking_private_key = "{{ aws_secret_customer_networking_private_key }}"
+aws_secret_worker_node_private_key = "{{ aws_secret_worker_node_private_key }}"
+aws_secret_data_lake_emr_host_private_key = "{{ aws_secret_data_lake_emr_host_private_key }}"
+aws_secret_cluster_bastion_host_private_key = "{{ aws_secret_cluster_bastion_host_private_key }}"
+aws_secret_bastion_host_bastion_private_key = "{{ aws_secret_bastion_host_bastion_private_key }}"
+aws_secret_ingress_mirth_ubuntu_private_key = "{{ aws_secret_ingress_mirth_ubuntu_private_key }}"
+
+###################################################################
+#  Enable KMS key rotation
+###################################################################
+enable_key_rotation = "{{ enable_key_rotation|lower }}"

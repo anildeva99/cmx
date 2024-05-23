@@ -1,0 +1,27 @@
+# Customer specific stuff!
+
+# Enable Cisco CSRs for customer customer networking ?
+enable_customer_networking: false
+customer_networking_instance_type: t2.medium
+
+# Customer VPN AMIs (Cisco Cloud Services Router (CSR) 1000V - Security Pkg. Max Performance)
+customer_networking_amis:
+  us-west-2: ami-076cd1de76b34bcb1
+
+##########
+# Partners
+##########
+partners_ingress_open_ports:
+  - 6771 # MGH (Test)
+  - 6772 # MGH (Test 2)
+
+partners_vpn_secret_recovery_window_days: 30
+
+#############
+# CU Medicine
+#############
+cumedicine_ingress_open_ports:
+  - 31001 # ADT (Admission/Discharge/Transfer)
+  - 31002 # ORU (Radiology Orders)
+
+cumedicine_vpn_secret_recovery_window_days: 30

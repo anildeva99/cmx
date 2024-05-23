@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -x
+
+{% for developer in developers %}
+  adduser -D {{ developer.name | lower }}
+
+  passwd -d {{ developer.name | lower }}
+
+  mkdir /home/{{ developer.name | lower }}/.ssh
+
+  cp /home/bastion/{{ developer.name | lower }}-public_key /home/{{ developer.name | lower }}/.ssh/authorized_keys
+
+  chown -R {{ developer.name | lower }}:nogroup /home/{{ developer.name | lower }}/.ssh
+
+  chmod -R 700 /home/{{ developer.name | lower }}/.ssh
+
+{% endfor %}

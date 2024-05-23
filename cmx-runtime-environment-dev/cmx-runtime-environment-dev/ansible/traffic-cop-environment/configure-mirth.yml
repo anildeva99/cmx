@@ -1,0 +1,136 @@
+---
+- name: Run always tasks
+  hosts: local
+  connection: local
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+        tasks_from: "{{ task }}"
+      loop:
+        - main
+        - checks
+      loop_control:
+        loop_var: task
+  tags: ['always']
+
+- name: Pre configuration tasks for Mirth
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Prepare to use the bastion host
+      import_role:
+        name: bastion
+        tasks_from: pre.yml
+
+    - name: Prepare to connect with Mirth
+      import_role:
+        name: mirth
+        tasks_from: pre.yml
+
+    - name: Do local preparation for Mirth setup
+      vars:
+        secondary_private_ip_addresses:
+          - "{{ partners_networking_mirth_ip }}"
+          - "{{ cumedicine_networking_mirth_ip }}"
+          - "{{ yale_networking_mirth_ip }}"
+      import_role:
+        name: mirth
+        tasks_from: locals.yml
+
+    - name: Create temporary private key file for bastion host, ubuntu
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_bastion_host_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+    - name: Create temporary private key file for mirth, ubuntu
+      vars:
+        aws_secret_key_name_var: "{{ aws_secret_mirth_ubuntu_private_key }}"
+        localhost_key_path_var: "{{ mirth_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: create-temporary-key-file.yml
+
+- name: Configure Mirth
+  hosts: mirth.{{ env }}.trafficcop.codametrix.com
+  gather_facts: false
+  vars:
+    # Definitely prefer the first configuration,
+    # but it doesn't seem to want to work.
+    #ansible_ssh_common_args:
+    # "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    ansible_ssh_common_args: >
+      -o ProxyCommand="ssh -i {{ bastion_host_ubuntu_private_key_path }}
+      -o StrictHostKeyChecking=no
+      -q
+      -A ubuntu@bastion.{{ env }}.trafficcop.codametrix.com nc %h %p"
+    state: present
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+
+    - name: Prep Mirth
+      vars:
+        mirth_db_secret: "{{ hostvars['localhost']['mirth_db_secret'] }}"
+        image_versions: "{{ hostvars['localhost']['image_versions'] }}"
+        secondary_private_ip_addresses:
+          - "{{ partners_networking_mirth_ip }}"
+          - "{{ cumedicine_networking_mirth_ip }}"
+          - "{{ yale_networking_mirth_ip }}"
+      import_role:
+        name: mirth
+        tasks_from: configure-mirth.yml
+
+# NOTE: Doing this as a separate play
+# as a hack to let ubuntu user group changes to take effect
+# (newgrp, sudo didn't want to work)
+- name: Start Mirth
+  hosts: mirth.{{ env }}.trafficcop.codametrix.com
+  gather_facts: false
+  vars:
+    # Definitely prefer the first configuration,
+    # but it doesn't seem to want to work.
+    #ansible_ssh_common_args: "-C -F {{ temp_directory }}/ssh-{{ env }}.cfg"
+    ansible_ssh_common_args: >
+      -o ProxyCommand="ssh -i {{ bastion_host_ubuntu_private_key_path }}
+      -o StrictHostKeyChecking=no
+      -q
+      -A ubuntu@bastion.{{ env }}.trafficcop.codametrix.com nc %h %p"
+    state: present
+  tasks:
+    - name: Include always role
+      include_role:
+        name: always
+
+    - name: Start Mirth
+      import_role:
+        name: mirth
+        tasks_from: start-mirth.yml
+
+- name: Post configuration tasks for Mirth
+  hosts: local
+  connection: local
+  gather_facts: false
+  vars:
+    state: present
+  tasks:
+    - name: Delete temporary private key file for ubuntu on the bastion host
+      vars:
+        localhost_temporary_key_path_var: "{{ bastion_host_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml
+
+    - name: Delete temporary private key file for ubuntu on mirth
+      vars:
+        localhost_temporary_key_path_var: "{{ mirth_ubuntu_private_key_path }}"
+      import_role:
+        name: keypair-secrets
+        tasks_from: delete-temporary-key-file.yml

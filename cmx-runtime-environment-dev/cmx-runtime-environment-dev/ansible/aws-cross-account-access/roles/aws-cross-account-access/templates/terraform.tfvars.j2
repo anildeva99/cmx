@@ -1,0 +1,29 @@
+aws_region                   = "{{ region }}"
+environment                  = "{{ env }}"
+
+# Foreign accounts which will be given access to ECR in this account
+foreign_accounts             = [
+  {% for acct in foreign_accounts %}
+  "{{ acct }}",
+  {% endfor %}
+]
+
+# ECR repos that will be enabled for cross-account access
+ecr_repos                    = [
+  {% for repo in ecr_repos %}
+  "{{ repo }}",
+  {% endfor %}
+]
+
+kms_keys                       = [
+  {% for each_key in kms_keys %}
+    {
+      key_alias       = "{{ each_key.key_alias }}",
+      key_operations  = [
+        {% for each_operation in each_key.key_operations %}
+          "{{ each_operation }}",
+        {% endfor %}
+      ]
+    },
+  {% endfor %}
+]

@@ -1,0 +1,61 @@
+---
+# CodaMetrix account ID (standard ECR repository location)
+codametrix_tools_account_id: "643073444324"
+sso_login_account_id: "643073444324"
+codametrix_tools_vpn_sg: "sg-048b872f81382cb63"
+codametrix_tools_dundas_sg: "sg-02a135d30f65c856c"
+codametrix_tools_cidr: "10.11.0.0/16"
+
+dundas_application_database_additional_ingress_sgs: []
+
+dundas_warehouse_database_additional_ingress_sgs: []
+
+peer_vpc_routes: []
+
+# Deploy Dundas Resources
+dundas_amis: {}
+dundas_autoscaling_group:
+  max_size: 1
+  min_size: 1
+  desired_capacity: 1
+dundas_instance_type: t2.micro
+dundas_keypair_public_key: ""
+
+# Dundas database parameters
+dundas_application_database_size: 256
+dundas_application_database_version: "11.7"
+dundas_application_database_instance_class: "db.m5.2xlarge"
+dundas_application_database_backup_retention_period: 14
+dundas_application_database_deletion_protection: false
+dundas_application_database_enabled_cloudwatch_logs_exports: []
+dundas_application_database_monitoring_interval: 30
+dundas_application_database_secret_recovery_window_days: 0
+
+# Dundas warehouse database parameters
+dundas_warehouse_database_size: 1000
+dundas_warehouse_database_version: "11.7"
+dundas_warehouse_database_instance_class: "db.m5.2xlarge"
+dundas_warehouse_database_backup_retention_period: 3
+dundas_warehouse_database_deletion_protection: false
+dundas_warehouse_database_enabled_cloudwatch_logs_exports: []
+dundas_warehouse_database_monitoring_interval: 30
+dundas_warehouse_database_secret_recovery_window_days: 0
+
+# Dundas application will use database called 'dundas'
+dundas_application_database_name: dundasApplication
+dundas_application_database_admin_username: root
+dundas_application_database_username: dundas
+
+# Dundas application will use database called 'dundas'
+dundas_warehouse_database_name: dundasWarehouse
+dundas_warehouse_database_admin_username: root
+dundas_warehouse_database_username: dundas
+
+rds_certificate_bundle_url: https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
+rds_certificate_bundle_path: /usr/local/share/ca-certificates/rds-combined-ca-bundle.crt
+
+terraform_path: ../../terraform/data-central-environment
+keypair_terraform_path: ../../terraform/data-central-ssh-keypair
+
+# Override to 'true' to force terraform initialization
+force_init: true

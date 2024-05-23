@@ -1,0 +1,75 @@
+data "aws_caller_identity" "current" {}
+
+{% for each_bucket, bucket_spec_array in s3_buckets.items() %}
+# Creates Policy which grants foreign_accounts access to s3_buckets
+resource "aws_s3_bucket_policy" "share_buckets_{{ each_bucket.split('.')[0] }}" {
+  bucket = "{{ each_bucket }}"
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+    {% for each_block in bucket_spec_array %}
+        {
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": [
+                ${join(", ", formatlist("\"arn:aws:iam::%s:root\"", [
+                       {% for each_account in each_block.foreign_account %}
+                          "{{ each_account  }}",
+                       {% endfor %}
+                ]
+                )) }
+              ]
+            },
+            "Action": [ ${join(", ", formatlist("\"%s\"", [
+                  {% for each_action in each_block.bucket_object_actions %}
+                    "{{ each_action  }}",
+                  {% endfor %}
+            ]
+            )) } ],
+            "Resource": "arn:aws:s3:::{{ each_bucket }}/{{ each_block.bucket_object_spec }}"
+        },
+        {
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": [
+                 ${join(", ", formatlist("\"arn:aws:iam::%s:root\"", [
+                         {% for each_account in each_block.foreign_account %}
+                            "{{ each_account  }}",
+                         {% endfor %}
+                ]
+                )) }
+              ]
+            },
+            "Action": [ ${join(", ", formatlist("\"%s\"",[
+              {% for each_action in each_block.bucket_actions %}
+               "{{ each_action  }}",
+              {% endfor %}
+            ]
+            )) } ],
+            "Resource": "arn:aws:s3:::{{ each_bucket }}"
+        },
+   {% endfor %}
+        {
+            "Sid": "S3 Account Bucket Policy {{ each_bucket }}",
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+            },
+            "Action": "s3:*",
+            "Resource": "arn:aws:s3:::{{ each_bucket }}/*"
+        },
+        {
+            "Sid": "S3 Account Bucket Policy {{ each_bucket }}",
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+            },
+            "Action": "s3:*",
+            "Resource": "arn:aws:s3:::{{ each_bucket }}"
+        }
+    ]
+}
+EOF
+}
+{% endfor %}
