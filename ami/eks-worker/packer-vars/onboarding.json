@@ -1,0 +1,12 @@
+{
+	"_comment1": "Note: Source AMI ami-07133d56ce5a362f0 is the current standard EKS version 1.16 image (amazon-eks-node-1.16-v20201211, us-east-1)",
+	"_comment2": "Note: subnet-06fc044b is within the default cmxonboarding VPC (vpc-2ed29754)",
+	"_comment3": "aws ssm get-parameter --name /aws/service/eks/optimized-ami/1.16/amazon-linux-2/recommended/image_id --region us-east-1 --query 'Parameter.Value' --output text",
+
+	"source_ami": "ami-07133d56ce5a362f0",
+	"vpc_id": "vpc-2ed29754",
+	"subnet_id": "subnet-06fc044b",
+	"volume_size": "20",
+	"name_tag": "cmx-runtime-environment-eks-worker-1.16b",
+	"ami_name": "CodaMetrix Runtime Environment EKS Worker 1.16b - Encrypted"
+}

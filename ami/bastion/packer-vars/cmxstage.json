@@ -1,0 +1,11 @@
+{
+	"_comment1": "Note: Source AMI ami-03a2cbdcd9e7d1955 is the current standard Ubuntu 18.04 LTS image (us-east-1)",
+	"_comment2": "Note: subnet-be07d0e1 is within the default cmxstage VPC (vpc-35846248)",
+
+	"source_ami": "ami-03a2cbdcd9e7d1955",
+	"vpc_id": "vpc-35846248",
+	"subnet_id": "subnet-be07d0e1",
+	"volume_size": "20",
+	"name_tag": "cmx-runtime-environment-bastion-1.1a",
+	"ami_name": "CodaMetrix Runtime Environment Bastion 1.1a - Encrypted"
+}

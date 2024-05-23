@@ -1,0 +1,11 @@
+{
+	"_comment1": "Note: Source AMI ami-064a0193585662d74 is the current standard Ubuntu 18.04 LTS image (us-east-1)",
+	"_comment2": "Note: subnet-23a56944 is within the default development VPC (vpc-2ff6f64a)",
+
+	"source_ami": "ami-064a0193585662d74",
+	"vpc_id": "vpc-2ff6f64a",
+	"subnet_id": "subnet-23a56944",
+	"volume_size": "20",
+	"name_tag": "cmx-runtime-environment-dundas-unix-1.0a",
+	"ami_name": "CodaMetrix Runtime Environment Dundas Unix 1.0a - Encrypted"
+}

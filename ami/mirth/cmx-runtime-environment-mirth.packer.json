@@ -1,0 +1,71 @@
+{
+  "_comment1": "1: Note: t2.micro instance requires a vpc/subnet, so the packer builder needs those things supplied",
+  "_comment2": "2: Note: Need the associate_public_ip_address flag set so packer can communicate with the builder instance",
+  "_comment3": "3: Note: Packer 1.2.3 failed to run shell provisioners on Windows/Linux (vagrant), downgraded to 1.2.1",
+  "variables": {
+    "source_ami": null,
+    "vpc_id": null,
+    "subnet_id": null,
+    "volume_size": "20"
+  },
+  "builders": [
+    {
+      "ami_name": "{{user `ami_name`}}",
+      "type": "amazon-ebs",
+      "region": "us-east-1",
+      "source_ami": "{{user `source_ami`}}",
+      "instance_type": "t2.micro",
+      "encrypt_boot": true,
+      "force_deregister": true,
+      "force_delete_snapshot": true,
+      "ssh_username": "ubuntu",
+      "vpc_id": "{{user `vpc_id`}}",
+      "subnet_id": "{{user `subnet_id`}}",
+      "associate_public_ip_address": true,
+      "ami_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "delete_on_termination": true,
+          "volume_size": "{{user `volume_size`}}",
+          "volume_type": "gp2"
+        }
+      ],
+      "launch_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "delete_on_termination": true,
+          "volume_size": "{{user `volume_size`}}",
+          "volume_type": "gp2"
+        }
+      ],
+      "tags": [
+        { "Name": "{{user `name_tag`}}" }
+      ],
+      "run_tags": [
+        { "Name": "{{user `name_tag`}}" }
+      ],
+      "snapshot_tags": [
+        { "Name": "{{user `name_tag`}}" }
+      ]
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "files/20auto-upgrades",
+      "destination": "/tmp/20auto-upgrades"
+    },
+    {
+      "type": "shell",
+      "inline": [ "sudo cp /tmp/20auto-upgrades /etc/apt/apt.conf.d/20auto-upgrades" ]
+    },
+    {
+      "type": "shell",
+      "script": "scripts/install-os-packages.sh"
+    },
+    {
+      "type": "shell",
+      "script": "scripts/cleanup.sh"
+    }
+  ]
+}

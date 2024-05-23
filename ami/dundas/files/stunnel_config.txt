@@ -1,0 +1,11 @@
+[postgres-app]
+client=yes
+protocol=pgsql
+accept=$env:DB_TUNNEL_URL`:$env:DB_TUNNEL_PORT
+connect=$env:DB_ADDRESS`:$env:DB_PORT
+
+[postgres-warehouse]
+client=yes
+protocol=pgsql
+accept=$env:DB_WAREHOUSE_TUNNEL_URL`:$env:DB_WAREHOUSE_TUNNEL_PORT
+connect=$env:DB_WAREHOUSE_ADDRESS`:$env:DB_WAREHOUSE_PORT

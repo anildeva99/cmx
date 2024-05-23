@@ -1,0 +1,100 @@
+{
+  "_comment0": "Note: Download the Dundas BI Ubuntu installer from your dundas account, then rename it to `dundas-installer.deb` and place it in the `files/` directory.",
+  "_comment1": "Note: t2.micro instance requires a vpc/subnet, so the packer builder needs those things supplied",
+  "_comment2": "Note: Need the associate_public_ip_address flag set so packer can communicate with the builder instance",
+  "_comment3": "Note: Packer 1.2.3 failed to run shell provisioners on Windows/Linux (vagrant), downgraded to 1.2.1",
+  "variables": {
+    "source_ami": null,
+    "vpc_id": null,
+    "subnet_id": null,
+    "volume_size": "20"
+  },
+  "builders": [
+    {
+      "ami_name": "{{user `ami_name`}}",
+      "type": "amazon-ebs",
+      "region": "us-east-1",
+      "source_ami": "{{user `source_ami`}}",
+      "instance_type": "t2.micro",
+      "encrypt_boot": true,
+      "force_deregister": true,
+      "force_delete_snapshot": true,
+      "ssh_username": "ubuntu",
+      "vpc_id": "{{user `vpc_id`}}",
+      "subnet_id": "{{user `subnet_id`}}",
+      "associate_public_ip_address": true,
+      "ami_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "delete_on_termination": true,
+          "volume_size": "{{user `volume_size`}}",
+          "volume_type": "gp2"
+        }
+      ],
+      "launch_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "delete_on_termination": true,
+          "volume_size": "{{user `volume_size`}}",
+          "volume_type": "gp2"
+        }
+      ],
+      "tags": [
+        { "Name": "{{user `name_tag`}}" }
+      ],
+      "run_tags": [
+        { "Name": "{{user `name_tag`}}" }
+      ],
+      "snapshot_tags": [
+        { "Name": "{{user `name_tag`}}" }
+      ]
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "files/20auto-upgrades",
+      "destination": "/tmp/20auto-upgrades"
+    },
+    {
+      "type": "file",
+      "source": "files/dundas-deployment.xml",
+      "destination": "/home/ubuntu/dundas-deployment.xml"
+    },
+    {
+      "type": "file",
+      "source": "files/dundas-installer.deb",
+      "destination": "/home/ubuntu/dundas-installer.deb"
+    },
+    {
+      "type": "file",
+      "source": "files/aws_config.txt",
+      "destination": "/home/ubuntu/aws_config.txt"
+    },
+    {
+      "type": "file",
+      "source": "scripts/configure-dundas.sh",
+      "destination": "/home/ubuntu/configure-dundas.sh"
+    },
+    {
+      "type": "shell",
+      "inline": ["sudo cp /home/ubuntu/configure-dundas.sh /var/lib/cloud/scripts/per-instance/configure-dundas.sh"]
+    },
+    {
+      "type": "shell",
+      "inline": ["sudo chmod +x /var/lib/cloud/scripts/per-instance/configure-dundas.sh"]
+    },
+    {
+      "type": "shell",
+      "script": "scripts/configure-os.sh"
+    },
+    {
+      "type": "shell",
+      "inline": ["mv /home/ubuntu/aws_config.txt /home/ubuntu/.aws/config"]
+    },
+    {
+      "type": "shell",
+      "script": "scripts/cleanup.sh"
+    }
+  ]
+}

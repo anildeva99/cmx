@@ -1,0 +1,11 @@
+{
+	"_comment1": "Note: Source AMI ami-00ddb0e5626798373 is the current standard Ubuntu 18.04 LTS image (us-east-1)",
+	"_comment2": "Note: subnet-06fc044b is within the default cmxonboarding VPC (vpc-2ed29754)",
+
+	"source_ami": "ami-00ddb0e5626798373",
+	"vpc_id": "vpc-2ed29754",
+	"subnet_id": "subnet-06fc044b",
+	"volume_size": "20",
+	"name_tag": "cmx-runtime-environment-mirth-1.0a",
+	"ami_name": "CodaMetrix Runtime Environment Mirth 1.0a - Encrypted"
+}

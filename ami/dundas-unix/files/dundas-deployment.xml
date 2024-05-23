@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-16"?>
+<AddInstanceToServer xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<!-- The license text. The license text should be xml encoded. -->
+<!-- Optional - If this is not specified, the evaluation license will still be applied. -->
+<LicenseText>${LICENSE}</LicenseText>
+
+<!-- Optional - Only used when creating new databases. -->
+<!-- The admin information. -->
+<Admin>
+  <!-- The admin username. -->
+  <AdminUsername>${ADMIN_USER}</AdminUsername>
+
+  <!-- The admin password. -->
+  <AdminPassword>${ADMIN_PASS}</AdminPassword>
+
+  <!-- The admin email address. -->
+  <AdminEmailAddress>${ADMIN_EMAIL}</AdminEmailAddress>
+</Admin>
+
+
+<!-- The Web Information -->
+<Web>
+  <!-- The path to the main web application to be created. -->
+  <!-- For a virtual directory: IIS://localhost/W3SVC/1/Root/SomeSite, where 1 repsents the site ID, and SomeSite represents the name of the virtual directory. -->
+  <!-- For a website: IIS://localhost/W3SVC/1324, where 1324 represents the site ID and the WebApplicationName property will represent the name of the site. -->
+  <WebApplicationPath>IIS://localhost/W3SVC/9493956/</WebApplicationPath>
+
+  <!-- The name of the application pool. -->
+  <ApplicationPoolName>Dundas BI</ApplicationPoolName>
+
+  <!-- The application pool identity. -->
+  <ApplicationPoolIdentity>
+    <!-- Possible Values (LocalSystem,LocalService,NetworkService,SpecificUser,ApplicationPoolIdentity) -->
+    <!-- The type of identity. -->
+    <IdentityType>NetworkService</IdentityType>
+
+    <!-- Optional - Only user when the identity type is set to specific user. -->
+    <!-- The full username. -->
+    <!-- Username>domain\username</Username> -->
+
+    <!-- Optional - Only user when the identity type is set to specific user. -->
+    <!-- The password. -->
+    <!-- Password>password</Password> -->
+  </ApplicationPoolIdentity>
+  <!-- Optional - This value is only used when creating a website. When creating a virtual directory the web application name will be determined by the MetabasePath. -->
+  <!-- The name of the Dundas BI web Application. -->
+  <WebApplicationName>DundasBI</WebApplicationName>
+  <!-- Optional - This value is only used when creating a website. When creating a virtual directory these binding will be ignored. -->
+  <!-- A list of website bindings -->
+  <WebsiteBinding>
+    <!-- Possible Values (Http,Https) -->
+    <!-- The type of binding. -->
+    <BindingType>Https</BindingType>
+
+    <!-- Optional -->
+    <!-- The IP address. -->
+    <!-- IPAddress>127.0.0.1</IPAddress> -->
+
+    <!-- Optional -->
+    <!-- The host name. -->
+    <!-- HostName>HostName</HostName> -->
+
+    <!-- The port number. -->
+    <Port>443</Port>
+
+    <!-- Optional - Used only when using https. This property is not used, use CertificateFriendlyOrSimpleName instead. -->
+    <!-- CertificateStoreName is deprecated, use CertificateFriendlyOrSimpleName instead. -->
+    <!-- CertificateStoreName>deprecated</CertificateStoreName> -->
+
+    <!-- Optional - Used only when using https. -->
+    <!-- The name of the https certificate friendly or simple name. -->
+    <CertificateFriendlyOrSimpleName>dundasbi-certificate</CertificateFriendlyOrSimpleName>
+  </WebsiteBinding>
+</Web>
+
+
+<!-- The Database Information -->
+<Database>
+  <!-- Possible Values (SqlServer,Postgres) -->
+  <!-- The type of database server to use. -->
+  <ApplicationStorageEngine>Postgres</ApplicationStorageEngine>
+
+  <!-- The application database connection string. -->
+  <ApplicationDatabaseConnectionString>Username=${DB_USER};Password=${DB_PASS};Database=${APPLICATION_DB};Host=${DB_ADDRESS};Port=${DB_PORT}</ApplicationDatabaseConnectionString>
+
+  <!-- Optional - Only used when creating new databases. -->
+  <!-- The warehouse database connection string. -->
+  <WarehouseDatabaseConnectionString>Username=${DB_WAREHOUSE_USER};Password=${DB_WAREHOUSE_PASS};Database=${WAREHOUSE_DB};Host=${DB_WAREHOUSE_ADDRESS};Port=${DB_WAREHOUSE_PORT}</WarehouseDatabaseConnectionString>
+
+  <!-- Possible Values (CreateNewDatabases,UseExistingDatabases) -->
+  <!-- The database option to either create new databases, or use existing databases. -->
+  <DatabaseOption>UseExistingDatabases</DatabaseOption>
+</Database>
+
+
+<!-- The Instance Information -->
+<Instance>
+  <!-- The Installation Directory. -->
+  <InstanceDirectory>C:\Dundas BI\Instances\InstanceName\CodaMetrixTools</InstanceDirectory>
+
+  <!-- The unique instance name. -->
+  <InstanceName>DundasBICodaMetrixTools</InstanceName>
+
+  <!-- The instance description. -->
+  <InstanceDescription>CodaMetrix tools Dundas BI instance.</InstanceDescription>
+</Instance>
+
+
+<!-- The Service Information -->
+<!-- In a web warm scenerio only one scheduler server is used. -->
+<!-- To not add the scheduler service, omit the Service element from this xml file. -->
+<Service>
+  <!-- The name of the service to be created. -->
+  <ServiceName>Dundas BI</ServiceName>
+
+  <!-- The identity that the service will run under. -->
+    <ServiceIdentity>
+      <!-- Possible Values (LocalSystem,LocalService,NetworkService,SpecificUser,ApplicationPoolIdentity) -->
+      <!-- The type of identity. -->
+      <IdentityType>NetworkService</IdentityType>
+
+      <!-- Optional - Only user when the identity type is set to specific user. -->
+      <!-- The full username. -->
+      <!-- <Username>domain\username</Username> -->
+
+      <!-- Optional - Only user when the identity type is set to specific user. -->
+      <!-- The password. -->
+      <!-- <Password>password</Password> -->
+    </ServiceIdentity>
+</Service>
+
+<!-- Optional -->
+<!-- Gets or sets Email Delivery Settings. -->
+<EmailServer>
+  <!-- The type of email delivery. -->
+  <EmailDeliveryType>Smtp</EmailDeliveryType>
+
+  <!-- The senders email address. -->
+  <SenderEmailAddress>dundasbi@codametrix.com</SenderEmailAddress>
+
+  <!-- Optional - This is used when the Email Delivery Type is set to DropFolder.  -->
+  <!-- The senders email address. i.e. C:\Email\EmailPickupDirectory -->
+  <EmailPickupDirectory>C:\Email\EmailPickupDirectory</EmailPickupDirectory>
+
+  <!-- Optional - This is used when the Email Delivery Type is set to Smtp. -->
+  <!-- A value indicating whether to enable SSL for SMTP when the Email Delivery Type is set to Smtp. -->
+  <SmtpEnableSsl>true</SmtpEnableSsl>
+
+  <!-- Optional - This is used when the Email Delivery Type is set to Smtp. -->
+  <!-- A value indicating the SMTP server address Email Delivery Type is set to Smtp. -->
+  <SmtpServer>${SMTP_SERVER}</SmtpServer>
+
+  <!-- Optional - This is used when the Email Delivery Type is set to Smtp.  Both the SmtpUsername, and SmtpPassword need to be set. -->
+  <!-- A value indicating the username name used for SMTP when the Email Delivery Type is set to Smtp. -->
+  <SmtpUsername>${SMTP_USER}</SmtpUsername>
+
+  <!-- Optional - This is used when the Email Delivery Type is set to Smtp.  Both the SmtpUsername, and SmtpPassword need to be set. -->
+  <!-- A value indicating the password used for SMTP when the Email Delivery Type is set to Smtp. -->
+  <SmtpPassword>${SMTP_PASS}</SmtpPassword>
+</EmailServer>
+
+<!-- Gets or sets a value indicating whether to backup existing databases. -->
+<BackupExistingDatabases>false</BackupExistingDatabases>
+
+<!-- Encrypt the application database connection string during deployment. -->
+<EncryptApplicationDatabaseConnectionString>true</EncryptApplicationDatabaseConnectionString>
+</AddInstanceToServer>

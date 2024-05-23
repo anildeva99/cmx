@@ -1,0 +1,12 @@
+{
+	"_comment1": "Note: Source AMI ami-05bb2dae0b1de90b3 is the current standard Windows_Server-2019-English-Full-Base-2020.06.10 (us-east-1)",
+	"_comment2": "Note: subnet-8bcc1bd4 is within the default cmxdatacentral VPC (vpc-984cabe5)",
+
+	"source_ami": "ami-05bb2dae0b1de90b3",
+	"iam_instance_profile_name": "CodaMetrixDataCentral-dc1-dundas_instance_role-profile",
+	"vpc_id": "vpc-984cabe5",
+	"subnet_id": "subnet-8bcc1bd4",
+	"volume_size": "30",
+	"name_tag": "cmx-runtime-environment-dundas-base-1.0a",
+	"ami_name": "CodaMetrix Runtime Environment Dundas Base 1.0a - Encrypted"
+}

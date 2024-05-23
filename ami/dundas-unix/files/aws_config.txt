@@ -1,0 +1,4 @@
+[default]
+credential_source = Ec2InstanceMetadata
+output = json
+region = us-east-1
